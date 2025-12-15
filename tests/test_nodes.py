@@ -6,6 +6,7 @@ Comprehensive test coverage for all PocketFlow nodes
 import pytest
 from unittest.mock import patch, MagicMock
 import json
+import asyncio
 
 # Import nodes to test
 from nodes import (
@@ -71,7 +72,8 @@ class TestMarketResearchNode:
     def test_prep_method(self):
         """Test preparation of research items."""
         node = MarketResearchNode()
-        prep_result = node.prep(self.sample_shared)
+        # AsyncBatchNode uses prep_async
+        prep_result = asyncio.run(node.prep_async(self.sample_shared))
         
         assert isinstance(prep_result, list)
         assert len(prep_result) == 2
@@ -79,22 +81,30 @@ class TestMarketResearchNode:
         assert prep_result[0]["company"] == "Google"
         assert prep_result[1]["company"] == "Microsoft"
     
-    @patch('nodes.research_company')
-    @patch('nodes.get_market_sentiment')
+    @patch('nodes.research_company_async')
+    @patch('nodes.get_market_sentiment_async')
     @patch('nodes.get_company_data')
     @patch('nodes.enrich_company_data')
     def test_exec_method(self, mock_enrich, mock_company_db, mock_sentiment, mock_research):
         """Test research execution with mocked dependencies."""
         # Setup mocks
-        mock_research.return_value = {
-            "company_name": "Google",
-            "research_analysis": "Test analysis",
-            "metrics": {"culture_score": {"score": 8}}
-        }
-        mock_sentiment.return_value = {
-            "company_name": "Google",
-            "sentiment_analysis": "Positive sentiment"
-        }
+        # Note: mocks for async functions should return a coroutine or be handled as async
+        async def mock_research_return(*args, **kwargs):
+            return {
+                "company_name": "Google",
+                "research_analysis": "Test analysis",
+                "metrics": {"culture_score": {"score": 8}}
+            }
+        
+        async def mock_sentiment_return(*args, **kwargs):
+            return {
+                "company_name": "Google",
+                "sentiment_analysis": "Positive sentiment"
+            }
+
+        mock_research.side_effect = mock_research_return
+        mock_sentiment.side_effect = mock_sentiment_return
+        
         mock_company_db.return_value = {
             "industry": "Technology",
             "glassdoor_rating": 4.3
@@ -105,14 +115,19 @@ class TestMarketResearchNode:
         }
         
         node = MarketResearchNode()
-        prep_result = node.prep(self.sample_shared)
-        exec_result = node.exec(prep_result)
+        prep_result = asyncio.run(node.prep_async(self.sample_shared))
         
-        assert isinstance(exec_result, list)
-        assert len(exec_result) == 2
-        assert exec_result[0]["offer_id"] == "offer_1"
-        assert "company_research" in exec_result[0]
-        assert "market_sentiment" in exec_result[0]
+        # AsyncBatchNode execution involves iterating over prep results
+        exec_results = []
+        for item in prep_result:
+            result = asyncio.run(node.exec_async(item))
+            exec_results.append(result)
+        
+        assert isinstance(exec_results, list)
+        assert len(exec_results) == 2
+        assert exec_results[0]["offer_id"] == "offer_1"
+        assert "company_research" in exec_results[0]
+        assert "market_sentiment" in exec_results[0]
     
     def test_post_method(self):
         """Test enrichment of offers with research data."""
@@ -127,7 +142,8 @@ class TestMarketResearchNode:
         }]
         
         shared = {"offers": [{"id": "offer_1", "company": "Google"}]}
-        node.post(shared, prep_result, exec_result)
+        # AsyncBatchNode uses post_async
+        asyncio.run(node.post_async(shared, prep_result, exec_result))
         
         # Verify enrichment
         offer = shared["offers"][0]
@@ -160,6 +176,7 @@ class TestCOLAdjustmentNode:
     def test_prep_method(self):
         """Test preparation of adjustment items."""
         node = COLAdjustmentNode()
+        # BatchNode uses regular prep
         prep_result = node.prep(self.sample_shared)
         
         assert isinstance(prep_result, list)
@@ -183,12 +200,17 @@ class TestCOLAdjustmentNode:
         
         node = COLAdjustmentNode()
         prep_result = node.prep(self.sample_shared)
-        exec_result = node.exec(prep_result)
         
-        assert isinstance(exec_result, list)
-        assert len(exec_result) == 1
-        assert "salary_adjustment" in exec_result[0]
-        assert "location_insights" in exec_result[0]
+        # BatchNode exec is called per item
+        exec_results = []
+        for item in prep_result:
+            result = node.exec(item)
+            exec_results.append(result)
+        
+        assert isinstance(exec_results, list)
+        assert len(exec_results) == 1
+        assert "salary_adjustment" in exec_results[0]
+        assert "location_insights" in exec_results[0]
 
 
 class TestMarketBenchmarkingNode:
@@ -212,32 +234,44 @@ class TestMarketBenchmarkingNode:
             ]
         }
     
-    @patch('nodes.get_compensation_insights')
-    @patch('nodes.calculate_market_percentile')
-    @patch('nodes.ai_market_analysis')
+    @patch('nodes.get_compensation_insights_async')
+    @patch('nodes.calculate_market_percentile_async')
+    @patch('nodes.ai_market_analysis_async')
     def test_exec_method(self, mock_ai_analysis, mock_percentile, mock_insights):
         """Test market benchmarking execution."""
-        mock_insights.return_value = {
-            "position_analysis": "Good fit",
-            "market_comparison": "Above average"
-        }
-        mock_percentile.side_effect = [
-            {"market_percentile": 75, "competitiveness": "Above Market"},
-            {"market_percentile": 80, "competitiveness": "Above Market"}
-        ]
-        mock_ai_analysis.return_value = {
-            "ai_analysis": "Strong market position"
-        }
+        # Use async mocks for AsyncBatchNode
+        async def mock_insights_return(*args, **kwargs):
+            return {
+                "position_analysis": "Good fit",
+                "market_comparison": "Above average"
+            }
+        
+        async def mock_percentile_return(*args, **kwargs):
+            return {"market_percentile": 75, "competitiveness": "Above Market"}
+            
+        async def mock_ai_analysis_return(*args, **kwargs):
+             return {
+                "ai_analysis": "Strong market position"
+            }
+
+        mock_insights.side_effect = mock_insights_return
+        mock_percentile.side_effect = mock_percentile_return
+        mock_ai_analysis.side_effect = mock_ai_analysis_return
         
         node = MarketBenchmarkingNode()
-        prep_result = node.prep(self.sample_shared)
-        exec_result = node.exec(prep_result)
+        prep_result = asyncio.run(node.prep_async(self.sample_shared))
         
-        assert isinstance(exec_result, list)
-        assert len(exec_result) == 1
-        assert "market_insights" in exec_result[0]
-        assert "market_analysis" in exec_result[0]
-        assert "total_comp_analysis" in exec_result[0]
+        # Iterate for batch processing
+        exec_results = []
+        for item in prep_result:
+            result = asyncio.run(node.exec_async(item))
+            exec_results.append(result)
+        
+        assert isinstance(exec_results, list)
+        assert len(exec_results) == 1
+        assert "market_insights" in exec_results[0]
+        assert "market_analysis" in exec_results[0]
+        assert "total_comp_analysis" in exec_results[0]
 
 
 class TestPreferenceScoringNode:
@@ -294,12 +328,21 @@ class TestPreferenceScoringNode:
         
         node = PreferenceScoringNode()
         prep_result = node.prep(self.sample_shared)
-        exec_result = node.exec(prep_result)
         
-        assert isinstance(exec_result, dict)
-        assert "offers_with_scores" in exec_result
-        assert "comparison_results" in exec_result
-        assert "weights_used" in exec_result
+        # Simulate batch execution
+        exec_results = []
+        for item in prep_result:
+            result = node.exec(item)
+            exec_results.append(result)
+            
+        assert isinstance(exec_results, list)
+        assert len(exec_results) == 1
+        assert exec_results[0]["offer_id"] == "offer_1"
+
+        # Test post
+        node.post(self.sample_shared, prep_result, exec_results)
+        assert "comparison_results" in self.sample_shared
+        assert "scoring_weights" in self.sample_shared
 
 
 class TestAIAnalysisNode:
@@ -325,18 +368,18 @@ class TestAIAnalysisNode:
             }
         }
     
-    @patch('nodes.call_llm')
+    @patch('nodes.call_llm_async')
     def test_exec_method(self, mock_llm):
         """Test AI analysis execution."""
-        mock_llm.side_effect = [
-            "Comprehensive analysis of offers...",
-            "Strong recommendation for Google",
-            "Decision framework: Consider growth potential..."
-        ]
+        # Async mocks
+        async def mock_llm_return(*args, **kwargs):
+            return "Mocked AI response"
+
+        mock_llm.side_effect = mock_llm_return
         
         node = AIAnalysisNode()
-        prep_result = node.prep(self.sample_shared)
-        exec_result = node.exec(prep_result)
+        prep_result = asyncio.run(node.prep_async(self.sample_shared))
+        exec_result = asyncio.run(node.exec_async(prep_result))
         
         assert isinstance(exec_result, dict)
         assert "ai_analysis" in exec_result
@@ -458,20 +501,19 @@ class TestNodeIntegration:
         }
         
         # Test that each node can process the shared data
-        # without actually calling external APIs
         
-        # Market Research prep should work
-        market_prep = self.market_node.prep(shared)
+        # Market Research prep_async
+        market_prep = asyncio.run(self.market_node.prep_async(shared))
         assert len(market_prep) == 1
         assert market_prep[0]["company"] == "Google"
         
-        # COL Adjustment prep should work
+        # COL Adjustment prep (Sync BatchNode)
         col_prep = self.col_node.prep(shared)
         assert len(col_prep) == 1
         assert col_prep[0]["base_salary"] == 150000
         
-        # Market Benchmarking prep should work
-        benchmark_prep = self.benchmark_node.prep(shared)
+        # Market Benchmarking prep_async
+        benchmark_prep = asyncio.run(self.benchmark_node.prep_async(shared))
         assert len(benchmark_prep) == 1
         assert benchmark_prep[0]["position"] == "Software Engineer"
     
@@ -491,7 +533,8 @@ class TestNodeIntegration:
             "enriched_data": {"industry": "tech"}
         }]
         
-        self.market_node.post(shared, prep_result, exec_result)
+        # AsyncBatchNode uses post_async
+        asyncio.run(self.market_node.post_async(shared, prep_result, exec_result))
         
         # Verify shared data was enriched
         offer = shared["offers"][0]
