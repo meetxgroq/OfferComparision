@@ -25,7 +25,7 @@ export default function ProfileManager({ onClose }: ProfileManagerProps) {
     try {
       // Simulate resume processing
       await new Promise(resolve => setTimeout(resolve, 3000))
-      
+
       // Mock extracted profile data
       const extractedProfile = {
         name: 'John Doe',
@@ -35,7 +35,7 @@ export default function ProfileManager({ onClose }: ProfileManagerProps) {
         skills: ['JavaScript', 'React', 'Node.js', 'Python', 'AWS'],
         resume_text: 'Senior Software Engineer with 5+ years of experience...'
       }
-      
+
       setProfile(prev => ({ ...prev, ...extractedProfile }))
     } catch (error) {
       console.error('Resume upload failed:', error)
@@ -55,34 +55,39 @@ export default function ProfileManager({ onClose }: ProfileManagerProps) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
       onClick={onClose}
     >
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
-        className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden"
+        className="glass-card w-full max-w-3xl max-h-[90vh] overflow-hidden rounded-2xl border border-white/10 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h3 className="text-xl font-semibold text-gray-900 flex items-center">
-            <UserIcon className="h-6 w-6 mr-2" />
+        <div className="flex items-center justify-between p-6 border-b border-white/10 bg-white/5">
+          <h3 className="text-xl font-bold text-white flex items-center gap-3">
+            <span className="p-2 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-600">
+              <UserIcon className="h-5 w-5 text-white" />
+            </span>
             Your Profile
           </h3>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-white/10 rounded-lg transition-colors text-slate-400 hover:text-white"
           >
-            <XMarkIcon className="h-5 w-5 text-gray-500" />
+            <XMarkIcon className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="overflow-y-auto max-h-[calc(90vh-120px)] p-6">
+        <div className="overflow-y-auto max-h-[calc(90vh-120px)] p-8 custom-scrollbar">
           {/* Resume Upload Section */}
-          <div className="mb-8">
-            <h4 className="text-lg font-medium text-gray-900 mb-4">Upload Your Resume</h4>
+          <div className="mb-10 bg-white/5 p-6 rounded-2xl border border-white/10">
+            <h4 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <DocumentTextIcon className="h-5 w-5 text-cyan-400" />
+              Upload Your Resume
+            </h4>
             <FileUpload
               onFileUpload={handleResumeUpload}
               acceptedTypes={['application/pdf', '.doc', '.docx']}
@@ -90,13 +95,13 @@ export default function ProfileManager({ onClose }: ProfileManagerProps) {
               placeholder="Drag & drop your resume here"
               isProcessing={isUploading}
             />
-            
+
             {isUploading && (
-              <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+              <div className="mt-4 p-4 bg-cyan-500/10 border border-cyan-500/20 rounded-xl">
                 <div className="flex items-center space-x-3">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
-                  <span className="text-sm text-blue-700">
-                    Processing your resume... Extracting skills and experience.
+                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-cyan-500 border-t-transparent"></div>
+                  <span className="text-sm text-cyan-300">
+                    AI extracting skills and experience...
                   </span>
                 </div>
               </div>
@@ -105,72 +110,62 @@ export default function ProfileManager({ onClose }: ProfileManagerProps) {
 
           {/* Profile Information */}
           <div className="space-y-6">
-            <h4 className="text-lg font-medium text-gray-900">Profile Information</h4>
-            
+            <h4 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Personal Details</h4>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Full Name
-                </label>
+                <label className="block text-sm font-medium text-slate-300 mb-2">Full Name</label>
                 <input
                   type="text"
                   value={profile.name}
                   onChange={(e) => setProfile(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  className="w-full px-4 py-3 bg-black/20 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all hover:border-white/20"
                   placeholder="John Doe"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Email
-                </label>
+                <label className="block text-sm font-medium text-slate-300 mb-2">Email</label>
                 <input
                   type="email"
                   value={profile.email}
                   onChange={(e) => setProfile(prev => ({ ...prev, email: e.target.value }))}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  className="w-full px-4 py-3 bg-black/20 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all hover:border-white/20"
                   placeholder="john@example.com"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Years of Experience
-                </label>
+                <label className="block text-sm font-medium text-slate-300 mb-2">Years of Experience</label>
                 <input
                   type="number"
                   value={profile.experience_years}
                   onChange={(e) => setProfile(prev => ({ ...prev, experience_years: parseInt(e.target.value) || 0 }))}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  className="w-full px-4 py-3 bg-black/20 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all hover:border-white/20"
                   placeholder="5"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Current Location
-                </label>
+                <label className="block text-sm font-medium text-slate-300 mb-2">Current Location</label>
                 <input
                   type="text"
                   value={profile.current_location}
                   onChange={(e) => setProfile(prev => ({ ...prev, current_location: e.target.value }))}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  className="w-full px-4 py-3 bg-black/20 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all hover:border-white/20"
                   placeholder="San Francisco, CA"
                 />
               </div>
             </div>
 
             {/* Skills */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Skills & Technologies
-              </label>
+            <div className="pt-4">
+              <label className="block text-sm font-medium text-slate-300 mb-2">Skills & Technologies</label>
               <div className="flex flex-wrap gap-2 mb-3">
                 {profile.skills.map((skill, index) => (
                   <span
                     key={index}
-                    className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium flex items-center"
+                    className="bg-cyan-500/10 text-cyan-300 px-3 py-1.5 rounded-lg text-sm font-medium flex items-center border border-cyan-500/20"
                   >
                     {skill}
                     <button
@@ -178,7 +173,7 @@ export default function ProfileManager({ onClose }: ProfileManagerProps) {
                         ...prev,
                         skills: prev.skills.filter((_, i) => i !== index)
                       }))}
-                      className="ml-2 text-blue-600 hover:text-blue-800"
+                      className="ml-2 text-cyan-400 hover:text-white transition-colors"
                     >
                       ×
                     </button>
@@ -188,7 +183,7 @@ export default function ProfileManager({ onClose }: ProfileManagerProps) {
               <input
                 type="text"
                 placeholder="Add skills (press Enter)"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                className="w-full px-4 py-3 bg-black/20 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all hover:border-white/20"
                 onKeyPress={(e) => {
                   if (e.key === 'Enter') {
                     const value = e.currentTarget.value.trim()
@@ -203,12 +198,10 @@ export default function ProfileManager({ onClose }: ProfileManagerProps) {
 
             {/* Resume Text Preview */}
             {profile.resume_text && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Resume Summary
-                </label>
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 max-h-40 overflow-y-auto">
-                  <p className="text-sm text-gray-700">{profile.resume_text}</p>
+              <div className="pt-4">
+                <label className="block text-sm font-medium text-slate-300 mb-2">Resume Summary</label>
+                <div className="bg-black/30 border border-white/10 rounded-xl p-4 max-h-40 overflow-y-auto text-sm text-slate-400 custom-scrollbar">
+                  <p>{profile.resume_text}</p>
                 </div>
               </div>
             )}
@@ -216,16 +209,16 @@ export default function ProfileManager({ onClose }: ProfileManagerProps) {
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end space-x-3 p-6 border-t border-gray-200">
+        <div className="flex justify-end space-x-4 p-6 border-t border-white/10 bg-white/5">
           <button
             onClick={onClose}
-            className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            className="px-6 py-3 text-slate-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors font-medium"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
-            className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg font-medium transition-all"
+            className="px-8 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl font-bold shadow-lg shadow-blue-500/30 transition-all transform hover:scale-105"
           >
             Save Profile
           </button>

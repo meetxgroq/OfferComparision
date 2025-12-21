@@ -2,38 +2,60 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --radius: 10px;
+@layer utilities {
+  .glass {
+    @apply bg-white/5 backdrop-blur-xl border border-white/10 shadow-xl;
+  }
+  
+  .glass-card {
+    @apply bg-slate-900/40 backdrop-blur-md border border-white/5 shadow-lg hover:border-white/10 transition-all duration-300;
+  }
+
+  .glass-button {
+    @apply bg-gradient-to-r from-cyan-500/10 to-blue-500/10 hover:from-cyan-500/20 hover:to-blue-500/20 
+           border border-cyan-500/20 hover:border-cyan-500/40 
+           text-cyan-100 backdrop-blur-sm transition-all duration-300;
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400;
+  }
 }
 
-.glass {
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.08);
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+body {
+  @apply bg-[#0f172a] text-slate-100 min-h-screen selection:bg-cyan-500/30;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.1) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(139, 92, 246, 0.1) 0px, transparent 50%);
+  background-attachment: fixed;
 }
 
-/* Custom slider styling */
+/* Custom slider styling - Premium Look */
 .slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
   appearance: none;
-  height: 16px;
-  width: 16px;
+  height: 20px;
+  width: 20px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #3b82f6, #06b6d4);
+  background: #0f172a;
+  border: 2px solid #38bdf8;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
   cursor: pointer;
-  border: 2px solid #1e293b;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  margin-top: -8px;
+  transition: all 0.2s ease;
 }
 
-.slider::-moz-range-thumb {
-  height: 16px;
-  width: 16px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #3b82f6, #06b6d4);
+.slider::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 0 15px rgba(56, 189, 248, 0.8);
+}
+
+.slider::-webkit-slider-runnable-track {
+  width: 100%;
+  height: 4px;
   cursor: pointer;
-  border: 2px solid #1e293b;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
 }
 
 

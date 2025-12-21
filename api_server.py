@@ -42,6 +42,12 @@ class Offer(BaseModel):
     total_compensation: Optional[float] = None
     years_experience: Optional[int] = None
     vesting_years: Optional[int] = 4
+    benefits_grade: Optional[str] = None
+    wlb_score: Optional[float] = None
+    growth_score: Optional[float] = None
+    role_fit: Optional[float] = None
+    work_type: Optional[str] = None
+    employment_type: Optional[str] = None
 
 
 class AnalyzeRequest(BaseModel):

@@ -120,7 +120,7 @@ export default function PreferencesPanel({ preferences, onSave, onClose }: Prefe
   const normalizeWeights = (weights: UserPreferences): UserPreferences => {
     const total = Object.values(weights).reduce((sum, value) => sum + value, 0)
     if (total === 0) return weights
-    
+
     return Object.keys(weights).reduce((normalized, key) => {
       normalized[key as keyof UserPreferences] = weights[key as keyof UserPreferences] / total
       return normalized
@@ -152,60 +152,72 @@ export default function PreferencesPanel({ preferences, onSave, onClose }: Prefe
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
       onClick={onClose}
     >
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
-        className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden"
+        className="glass-card w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl border border-white/10 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h3 className="text-xl font-semibold text-gray-900 flex items-center">
-            <AdjustmentsHorizontalIcon className="h-6 w-6 mr-2" />
+        <div className="flex items-center justify-between p-6 border-b border-white/10 bg-white/5">
+          <h3 className="text-xl font-bold text-white flex items-center gap-3">
+            <span className="p-2 rounded-lg bg-gradient-to-br from-purple-600 to-pink-600">
+              <AdjustmentsHorizontalIcon className="h-5 w-5 text-white" />
+            </span>
             Your Preferences
           </h3>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-white/10 rounded-lg transition-colors text-slate-400 hover:text-white"
           >
-            <XMarkIcon className="h-5 w-5 text-gray-500" />
+            <XMarkIcon className="h-5 w-5" />
           </button>
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b border-gray-200">
+        <div className="flex border-b border-white/10 bg-white/5">
           <button
             onClick={() => setActiveTab('quick')}
-            className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
-              activeTab === 'quick'
-                ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
+            className={`flex-1 py-4 px-4 text-sm font-semibold transition-all relative ${activeTab === 'quick'
+                ? 'text-purple-400 bg-white/5'
+                : 'text-slate-400 hover:text-white hover:bg-white/5'
+              }`}
           >
             Quick Presets
+            {activeTab === 'quick' && (
+              <motion.div
+                layoutId="activeTabPrefs"
+                className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-purple-400 to-pink-500"
+              />
+            )}
           </button>
           <button
             onClick={() => setActiveTab('custom')}
-            className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
-              activeTab === 'custom'
-                ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
+            className={`flex-1 py-4 px-4 text-sm font-semibold transition-all relative ${activeTab === 'custom'
+                ? 'text-purple-400 bg-white/5'
+                : 'text-slate-400 hover:text-white hover:bg-white/5'
+              }`}
           >
             Custom Weights
+            {activeTab === 'custom' && (
+              <motion.div
+                layoutId="activeTabPrefs"
+                className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-purple-400 to-pink-500"
+              />
+            )}
           </button>
         </div>
 
-        <div className="overflow-y-auto max-h-[calc(90vh-180px)] p-6">
+        <div className="overflow-y-auto max-h-[calc(90vh-180px)] p-8 custom-scrollbar">
           {activeTab === 'quick' ? (
             <div className="space-y-6">
               <div>
-                <h4 className="text-lg font-medium text-gray-900 mb-4">Choose Your Focus</h4>
-                <p className="text-sm text-gray-600 mb-6">
+                <h4 className="text-lg font-semibold text-white mb-2">Choose Your Focus</h4>
+                <p className="text-sm text-slate-400 mb-6">
                   Select a preset that matches your career priorities. You can always customize further.
                 </p>
               </div>
@@ -215,21 +227,23 @@ export default function PreferencesPanel({ preferences, onSave, onClose }: Prefe
                   <motion.button
                     key={preset.name}
                     onClick={() => handlePresetSelect(preset)}
-                    className="text-left p-6 border-2 border-gray-200 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-all"
+                    className="text-left p-6 border border-white/10 bg-white/5 rounded-2xl hover:border-purple-500/50 hover:bg-white/10 transition-all group relative overflow-hidden"
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                   >
-                    <div className="flex items-center space-x-3 mb-3">
+                    <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-pink-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                    <div className="flex items-center space-x-3 mb-3 relative z-10">
                       <span className="text-2xl">{preset.icon}</span>
-                      <h5 className="text-lg font-semibold text-gray-900">{preset.name}</h5>
+                      <h5 className="text-lg font-bold text-white group-hover:text-purple-300 transition-colors">{preset.name}</h5>
                     </div>
-                    <p className="text-sm text-gray-600 mb-4">{preset.description}</p>
-                    
-                    <div className="space-y-2">
+                    <p className="text-sm text-slate-400 mb-4 relative z-10">{preset.description}</p>
+
+                    <div className="space-y-2 relative z-10">
                       {PREFERENCE_DEFINITIONS.map((pref) => (
                         <div key={pref.key} className="flex items-center justify-between">
-                          <span className="text-xs text-gray-500">{pref.label}</span>
-                          <span className="text-xs font-medium text-gray-700">
+                          <span className="text-xs text-slate-500">{pref.label}</span>
+                          <span className="text-xs font-medium text-slate-300">
                             {Math.round(preset.weights[pref.key] * 100)}%
                           </span>
                         </div>
@@ -242,31 +256,34 @@ export default function PreferencesPanel({ preferences, onSave, onClose }: Prefe
           ) : (
             <div className="space-y-8">
               <div>
-                <h4 className="text-lg font-medium text-gray-900 mb-2">Custom Weight Assignment</h4>
-                <p className="text-sm text-gray-600 mb-4">
+                <h4 className="text-lg font-semibold text-white mb-2">Custom Weight Assignment</h4>
+                <p className="text-sm text-slate-400 mb-4">
                   Adjust the importance of each factor in your decision-making process.
                 </p>
-                
+
                 {totalWeight !== 1.0 && (
-                  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg mb-4">
-                    <p className="text-sm text-yellow-800">
-                      Weights will be automatically normalized to sum to 100%
+                  <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl mb-4">
+                    <p className="text-sm text-yellow-300 flex items-center gap-2">
+                      ⚠️ Weights will be automatically normalized to sum to 100%
                     </p>
                   </div>
                 )}
               </div>
 
-              <div className="space-y-6">
+              <div className="grid grid-cols-1 gap-4">
                 {PREFERENCE_DEFINITIONS.map((pref) => (
-                  <div key={pref.key} className="bg-gray-50 p-4 rounded-lg">
-                    <div className="flex items-center space-x-3 mb-3">
-                      <span className="text-xl">{pref.icon}</span>
+                  <div key={pref.key} className="bg-white/5 p-5 rounded-2xl border border-white/10 hover:border-white/20 transition-colors">
+                    <div className="flex items-center gap-4 mb-4">
+                      <span className="text-2xl p-2 bg-black/20 rounded-lg">{pref.icon}</span>
                       <div>
-                        <h5 className="font-medium text-gray-900">{pref.label}</h5>
-                        <p className="text-sm text-gray-600">{pref.description}</p>
+                        <h5 className="font-bold text-white">{pref.label}</h5>
+                        <p className="text-xs text-slate-400">{pref.description}</p>
+                      </div>
+                      <div className="ml-auto text-xl font-bold text-purple-400">
+                        {Math.round(localPreferences[pref.key] * 100)}%
                       </div>
                     </div>
-                    
+
                     <Slider
                       label=""
                       value={Math.round(localPreferences[pref.key] * 100)}
@@ -280,13 +297,13 @@ export default function PreferencesPanel({ preferences, onSave, onClose }: Prefe
               </div>
 
               {/* Weight Summary */}
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <h5 className="font-medium text-blue-900 mb-3">Weight Distribution</h5>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+              <div className="bg-gradient-to-br from-blue-900/40 to-purple-900/40 p-6 rounded-2xl border border-white/10">
+                <h5 className="font-bold text-white mb-4">Weight Distribution Summary</h5>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                   {PREFERENCE_DEFINITIONS.map((pref) => (
-                    <div key={pref.key} className="flex items-center justify-between">
-                      <span className="text-blue-700">{pref.label}</span>
-                      <span className="font-medium text-blue-900">
+                    <div key={pref.key} className="flex items-center justify-between p-2 bg-black/20 rounded-lg">
+                      <span className="text-slate-300">{pref.label}</span>
+                      <span className="font-bold text-white">
                         {Math.round(localPreferences[pref.key] * 100)}%
                       </span>
                     </div>
@@ -298,16 +315,16 @@ export default function PreferencesPanel({ preferences, onSave, onClose }: Prefe
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end space-x-3 p-6 border-t border-gray-200">
+        <div className="flex justify-end space-x-4 p-6 border-t border-white/10 bg-white/5">
           <button
             onClick={onClose}
-            className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            className="px-6 py-3 text-slate-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors font-medium"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
-            className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg font-medium transition-all"
+            className="px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-xl font-bold shadow-lg shadow-purple-500/30 transition-all transform hover:scale-105"
           >
             Save Preferences
           </button>

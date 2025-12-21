@@ -2,12 +2,13 @@
 
 import { useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { 
-  XMarkIcon, 
-  DocumentTextIcon, 
+import {
+  XMarkIcon,
+  DocumentTextIcon,
   CloudArrowUpIcon,
   CheckCircleIcon,
-  ExclamationTriangleIcon
+  ExclamationTriangleIcon,
+  CurrencyDollarIcon
 } from '@heroicons/react/24/outline'
 import { Offer, WORK_TYPES, EMPLOYMENT_TYPES, DOMAINS, BENEFITS_GRADES } from '@/types'
 import FileUpload from './FileUpload'
@@ -45,23 +46,23 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
 
   const validateForm = useCallback(() => {
     const newErrors: Record<string, string> = {}
-    
+
     if (!formData.company?.trim()) newErrors.company = 'Company is required'
     if (!formData.position?.trim()) newErrors.position = 'Position is required'
     if (!formData.location?.trim()) newErrors.location = 'Location is required'
     if (!formData.base_salary || formData.base_salary <= 0) newErrors.base_salary = 'Valid base salary is required'
-    
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }, [formData])
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!validateForm()) return
-    
+
     const totalCompensation = (formData.base_salary || 0) + (formData.equity || 0) + (formData.bonus || 0)
-    
+
     const offer: Offer = {
       id: editOffer?.id || Date.now().toString(),
       company: formData.company!,
@@ -83,7 +84,7 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
       other_perks: formData.other_perks,
       total_compensation: totalCompensation
     }
-    
+
     onSubmit(offer)
   }, [formData, validateForm, onSubmit, editOffer])
 
@@ -99,7 +100,7 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
     try {
       // Simulate file processing
       await new Promise(resolve => setTimeout(resolve, 2000))
-      
+
       // Mock extracted data
       const extractedData = {
         company: 'Google',
@@ -112,7 +113,7 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
         benefits_grade: 'A+' as const,
         job_description: 'Leading backend development for search infrastructure...'
       }
-      
+
       setFormData(prev => ({ ...prev, ...extractedData }))
       setActiveTab('manual')
     } catch (error) {
@@ -129,56 +130,66 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
       onClick={onClose}
     >
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
-        className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden"
+        className="glass-card w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl border border-white/10 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h3 className="text-xl font-semibold text-gray-900">
+        <div className="flex items-center justify-between p-6 border-b border-white/10 bg-white/5">
+          <h3 className="text-xl font-bold text-white">
             {editOffer ? 'Edit Offer' : 'Add New Offer'}
           </h3>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-white/10 rounded-lg transition-colors text-slate-400 hover:text-white"
           >
-            <XMarkIcon className="h-5 w-5 text-gray-500" />
+            <XMarkIcon className="h-5 w-5" />
           </button>
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b border-gray-200">
+        <div className="flex border-b border-white/10 bg-white/5">
           <button
             onClick={() => setActiveTab('manual')}
-            className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
-              activeTab === 'manual'
-                ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
+            className={`flex-1 py-4 px-4 text-sm font-semibold transition-all relative ${activeTab === 'manual'
+              ? 'text-cyan-400 bg-white/5'
+              : 'text-slate-400 hover:text-white hover:bg-white/5'
+              }`}
           >
             Manual Entry
+            {activeTab === 'manual' && (
+              <motion.div
+                layoutId="activeTab"
+                className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-cyan-400 to-blue-500"
+              />
+            )}
           </button>
           <button
             onClick={() => setActiveTab('upload')}
-            className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
-              activeTab === 'upload'
-                ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
+            className={`flex-1 py-4 px-4 text-sm font-semibold transition-all relative ${activeTab === 'upload'
+              ? 'text-cyan-400 bg-white/5'
+              : 'text-slate-400 hover:text-white hover:bg-white/5'
+              }`}
           >
             Upload Offer Letter
+            {activeTab === 'upload' && (
+              <motion.div
+                layoutId="activeTab"
+                className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-cyan-400 to-blue-500"
+              />
+            )}
           </button>
         </div>
 
-        <div className="overflow-y-auto max-h-[calc(90vh-120px)]">
+        <div className="overflow-y-auto max-h-[calc(90vh-140px)] custom-scrollbar">
           {activeTab === 'upload' ? (
-            <div className="p-6">
+            <div className="p-8">
               <FileUpload
                 onFileUpload={handleFileUpload}
                 acceptedTypes={['application/pdf', '.doc', '.docx']}
@@ -186,317 +197,228 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
                 placeholder="Drag & drop your offer letter here"
                 isProcessing={isUploading}
               />
-              
+
               {isUploading && (
-                <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                <div className="mt-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
                   <div className="flex items-center space-x-3">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
-                    <span className="text-sm text-blue-700">Processing your offer letter...</span>
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-500 border-t-transparent"></div>
+                    <span className="text-sm text-blue-300">Processing your offer letter...</span>
                   </div>
                 </div>
               )}
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="p-6 space-y-6">
+            <form onSubmit={handleSubmit} className="p-8 space-y-8">
               {/* Basic Information */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Company *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.company || ''}
-                    onChange={(e) => handleInputChange('company', e.target.value)}
-                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                      errors.company ? 'border-red-300 bg-red-50' : 'border-gray-300'
-                    }`}
-                    placeholder="e.g., Google, Microsoft, Apple"
-                  />
-                  {errors.company && (
-                    <p className="mt-1 text-sm text-red-600 flex items-center">
-                      <ExclamationTriangleIcon className="h-4 w-4 mr-1" />
-                      {errors.company}
-                    </p>
-                  )}
-                </div>
+              <div className="space-y-4">
+                <h4 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Core Details</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Company *</label>
+                    <input
+                      type="text"
+                      value={formData.company || ''}
+                      onChange={(e) => handleInputChange('company', e.target.value)}
+                      className={`w-full px-4 py-3 bg-white/5 border rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all ${errors.company ? 'border-red-500/50 focus:ring-red-500' : 'border-white/10 hover:border-white/20'
+                        }`}
+                      placeholder="e.g., Google, Microsoft"
+                    />
+                    {errors.company && <p className="mt-1 text-sm text-red-400">{errors.company}</p>}
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Position *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.position || ''}
-                    onChange={(e) => handleInputChange('position', e.target.value)}
-                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                      errors.position ? 'border-red-300 bg-red-50' : 'border-gray-300'
-                    }`}
-                    placeholder="e.g., Senior Software Engineer"
-                  />
-                  {errors.position && (
-                    <p className="mt-1 text-sm text-red-600 flex items-center">
-                      <ExclamationTriangleIcon className="h-4 w-4 mr-1" />
-                      {errors.position}
-                    </p>
-                  )}
-                </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Position *</label>
+                    <input
+                      type="text"
+                      value={formData.position || ''}
+                      onChange={(e) => handleInputChange('position', e.target.value)}
+                      className={`w-full px-4 py-3 bg-white/5 border rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all ${errors.position ? 'border-red-500/50 focus:ring-red-500' : 'border-white/10 hover:border-white/20'
+                        }`}
+                      placeholder="e.g., Senior Software Engineer"
+                    />
+                    {errors.position && <p className="mt-1 text-sm text-red-400">{errors.position}</p>}
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Location *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.location || ''}
-                    onChange={(e) => handleInputChange('location', e.target.value)}
-                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                      errors.location ? 'border-red-300 bg-red-50' : 'border-gray-300'
-                    }`}
-                    placeholder="e.g., San Francisco, CA"
-                  />
-                  {errors.location && (
-                    <p className="mt-1 text-sm text-red-600 flex items-center">
-                      <ExclamationTriangleIcon className="h-4 w-4 mr-1" />
-                      {errors.location}
-                    </p>
-                  )}
-                </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Location *</label>
+                    <input
+                      type="text"
+                      value={formData.location || ''}
+                      onChange={(e) => handleInputChange('location', e.target.value)}
+                      className={`w-full px-4 py-3 bg-white/5 border rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all ${errors.location ? 'border-red-500/50 focus:ring-red-500' : 'border-white/10 hover:border-white/20'
+                        }`}
+                      placeholder="e.g., San Francisco, CA"
+                    />
+                    {errors.location && <p className="mt-1 text-sm text-red-400">{errors.location}</p>}
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Domain/Technology
-                  </label>
-                  <select
-                    value={formData.domain || ''}
-                    onChange={(e) => handleInputChange('domain', e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                  >
-                    <option value="">Select domain...</option>
-                    {DOMAINS.map((domain) => (
-                      <option key={domain.value} value={domain.value}>
-                        {domain.label}
-                      </option>
-                    ))}
-                  </select>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Domain</label>
+                    <div className="relative">
+                      <select
+                        value={formData.domain || ''}
+                        onChange={(e) => handleInputChange('domain', e.target.value)}
+                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent appearance-none transition-all hover:border-white/20"
+                      >
+                        <option value="" className="bg-slate-800">Select domain...</option>
+                        {DOMAINS.map((domain) => (
+                          <option key={domain.value} value={domain.value} className="bg-slate-800">
+                            {domain.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               {/* Compensation */}
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="text-lg font-medium text-gray-900 mb-4">Compensation Details</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
+                <h4 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
+                  <span className="p-1 rounded bg-gradient-to-br from-green-500 to-emerald-600">
+                    <CurrencyDollarIcon className="h-4 w-4 text-white" />
+                  </span>
+                  Compensation Details
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Base Salary ($) *
-                    </label>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Base Salary ($) *</label>
                     <input
                       type="number"
                       value={formData.base_salary || ''}
                       onChange={(e) => handleInputChange('base_salary', parseInt(e.target.value) || 0)}
-                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                        errors.base_salary ? 'border-red-300 bg-red-50' : 'border-gray-300'
-                      }`}
+                      className={`w-full px-4 py-3 bg-black/20 border rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all ${errors.base_salary ? 'border-red-500/50' : 'border-white/10 hover:border-white/20'
+                        }`}
                       placeholder="150000"
                     />
-                    {errors.base_salary && (
-                      <p className="mt-1 text-sm text-red-600 flex items-center">
-                        <ExclamationTriangleIcon className="h-4 w-4 mr-1" />
-                        {errors.base_salary}
-                      </p>
-                    )}
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Equity/Stock Value ($)
-                    </label>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Equity/Stock ($/yr)</label>
                     <input
                       type="number"
                       value={formData.equity || ''}
                       onChange={(e) => handleInputChange('equity', parseInt(e.target.value) || 0)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                      className="w-full px-4 py-3 bg-black/20 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all hover:border-white/20"
                       placeholder="50000"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Annual Bonus ($)
-                    </label>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Annual Bonus ($)</label>
                     <input
                       type="number"
                       value={formData.bonus || ''}
                       onChange={(e) => handleInputChange('bonus', parseInt(e.target.value) || 0)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                      className="w-full px-4 py-3 bg-black/20 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all hover:border-white/20"
                       placeholder="25000"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Signing Bonus ($)
-                    </label>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Signing Bonus ($)</label>
                     <input
                       type="number"
                       value={formData.signing_bonus || ''}
                       onChange={(e) => handleInputChange('signing_bonus', parseInt(e.target.value) || 0)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                      className="w-full px-4 py-3 bg-black/20 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all hover:border-white/20"
                       placeholder="15000"
                     />
                   </div>
                 </div>
 
                 {totalCompensation > 0 && (
-                  <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <p className="text-sm font-medium text-green-800">
-                      Total Compensation: ${totalCompensation.toLocaleString()}
+                  <div className="mt-6 p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
+                    <p className="text-sm font-medium text-green-400 flex justify-between items-center">
+                      <span>Total Annual Compensation</span>
+                      <span className="text-xl font-bold">${totalCompensation.toLocaleString()}</span>
                     </p>
                   </div>
                 )}
               </div>
 
-              {/* Work Details */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Work Type
-                  </label>
-                  <select
-                    value={formData.work_type || 'hybrid'}
-                    onChange={(e) => handleInputChange('work_type', e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                  >
-                    {WORK_TYPES.map((type) => (
-                      <option key={type.value} value={type.value}>
-                        {type.label}
-                      </option>
-                    ))}
-                  </select>
+              {/* Work Details & Scores */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-4">
+                  <h4 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Role Details</h4>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Work Type</label>
+                    <select
+                      value={formData.work_type || 'hybrid'}
+                      onChange={(e) => handleInputChange('work_type', e.target.value)}
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent appearance-none transition-all hover:border-white/20"
+                    >
+                      {WORK_TYPES.map((type) => (
+                        <option key={type.value} value={type.value} className="bg-slate-800">{type.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Benefits Grade</label>
+                    <select
+                      value={formData.benefits_grade || 'B'}
+                      onChange={(e) => handleInputChange('benefits_grade', e.target.value)}
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent appearance-none transition-all hover:border-white/20"
+                    >
+                      {BENEFITS_GRADES.map((grade) => (
+                        <option key={grade.value} value={grade.value} className="bg-slate-800">{grade.label}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Employment Type
-                  </label>
-                  <select
-                    value={formData.employment_type || 'full-time'}
-                    onChange={(e) => handleInputChange('employment_type', e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                  >
-                    {EMPLOYMENT_TYPES.map((type) => (
-                      <option key={type.value} value={type.value}>
-                        {type.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Benefits Grade
-                  </label>
-                  <select
-                    value={formData.benefits_grade || 'B'}
-                    onChange={(e) => handleInputChange('benefits_grade', e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                  >
-                    {BENEFITS_GRADES.map((grade) => (
-                      <option key={grade.value} value={grade.value} title={grade.description}>
-                        {grade.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Subjective Scores */}
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="text-lg font-medium text-gray-900 mb-4">Subjective Ratings</h4>
-                <div className="space-y-6">
-                  <Slider
-                    label="Work-Life Balance"
-                    value={formData.wlb_score || 7}
-                    onChange={(value) => handleInputChange('wlb_score', value)}
-                    min={1}
-                    max={10}
-                    description="1=Very demanding, 10=Excellent balance"
-                  />
-
-                  <Slider
-                    label="Growth Opportunity"
-                    value={formData.growth_score || 7}
-                    onChange={(value) => handleInputChange('growth_score', value)}
-                    min={1}
-                    max={10}
-                    description="1=Limited growth, 10=Excellent opportunities"
-                  />
-
-                  <Slider
-                    label="Role Fit"
-                    value={formData.role_fit || 7}
-                    onChange={(value) => handleInputChange('role_fit', value)}
-                    min={1}
-                    max={10}
-                    description="1=Poor fit, 10=Perfect match for your skills/interests"
-                  />
+                <div className="space-y-4">
+                  <h4 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Subjective Ratings (1-10)</h4>
+                  <div className="bg-white/5 p-4 rounded-xl border border-white/10 space-y-6">
+                    <Slider
+                      label="Work-Life Balance"
+                      value={formData.wlb_score || 7}
+                      onChange={(value) => handleInputChange('wlb_score', value)}
+                      min={1} max={10}
+                      description="1=Poor, 10=Excellent"
+                    />
+                    <Slider
+                      label="Growth Opportunity"
+                      value={formData.growth_score || 7}
+                      onChange={(value) => handleInputChange('growth_score', value)}
+                      min={1} max={10}
+                      description="1=Limited, 10=Unlimited"
+                    />
+                    <Slider
+                      label="Role Fit"
+                      value={formData.role_fit || 7}
+                      onChange={(value) => handleInputChange('role_fit', value)}
+                      min={1} max={10}
+                      description="1=Poor fit, 10=Perfect match"
+                    />
+                  </div>
                 </div>
               </div>
 
               {/* Additional Details */}
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Job Description
-                  </label>
-                  <textarea
-                    value={formData.job_description || ''}
-                    onChange={(e) => handleInputChange('job_description', e.target.value)}
-                    rows={4}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                    placeholder="Used to calculate Role Fit based on your profile"
-                  />
-                </div>
-
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="relocation_support"
-                    checked={formData.relocation_support || false}
-                    onChange={(e) => handleInputChange('relocation_support', e.target.checked)}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                  />
-                  <label htmlFor="relocation_support" className="ml-2 block text-sm text-gray-700">
-                    Relocation Support Provided
-                  </label>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Other Perks & Notes
-                  </label>
-                  <textarea
-                    value={formData.other_perks || ''}
-                    onChange={(e) => handleInputChange('other_perks', e.target.value)}
-                    rows={3}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                    placeholder="Free meals, gym membership, learning budget, etc."
-                  />
-                </div>
+                <h4 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Notes & Perks</h4>
+                <textarea
+                  value={formData.other_perks || ''}
+                  onChange={(e) => handleInputChange('other_perks', e.target.value)}
+                  rows={3}
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all hover:border-white/20"
+                  placeholder="Additional perks, notes, or thoughts..."
+                />
               </div>
 
               {/* Form Actions */}
-              <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
+              <div className="flex justify-end space-x-4 pt-6 border-t border-white/10">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="px-6 py-3 text-slate-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors font-medium"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg font-medium transition-all"
+                  className="px-8 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl font-bold shadow-lg shadow-blue-500/30 transition-all transform hover:scale-105"
                 >
                   {editOffer ? 'Update Offer' : 'Save Offer'}
                 </button>
