@@ -52,9 +52,9 @@ export default function ProfileManager({ onClose }: ProfileManagerProps) {
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+      initial={{ opacity: 0, pointerEvents: "none" }}
+      animate={{ opacity: 1, pointerEvents: "auto" }}
+      exit={{ opacity: 0, pointerEvents: "none" }}
       className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
       onClick={onClose}
     >
@@ -62,11 +62,11 @@ export default function ProfileManager({ onClose }: ProfileManagerProps) {
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
-        className="glass-card w-full max-w-3xl max-h-[90vh] overflow-hidden rounded-2xl border border-white/10 shadow-2xl"
+        className="glass-card w-full max-w-3xl max-h-[90vh] flex flex-col rounded-2xl border border-white/10 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-white/10 bg-white/5">
+        <div className="flex-none flex items-center justify-between p-6 border-b border-white/10 bg-white/5">
           <h3 className="text-xl font-bold text-white flex items-center gap-3">
             <span className="p-2 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-600">
               <UserIcon className="h-5 w-5 text-white" />
@@ -81,7 +81,7 @@ export default function ProfileManager({ onClose }: ProfileManagerProps) {
           </button>
         </div>
 
-        <div className="overflow-y-auto max-h-[calc(90vh-120px)] p-8 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto min-h-0 p-8 custom-scrollbar">
           {/* Resume Upload Section */}
           <div className="mb-10 bg-white/5 p-6 rounded-2xl border border-white/10">
             <h4 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
@@ -209,7 +209,7 @@ export default function ProfileManager({ onClose }: ProfileManagerProps) {
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end space-x-4 p-6 border-t border-white/10 bg-white/5">
+        <div className="flex-none flex justify-end space-x-4 p-6 border-t border-white/10 bg-white/5">
           <button
             onClick={onClose}
             className="px-6 py-3 text-slate-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors font-medium"

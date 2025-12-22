@@ -112,6 +112,8 @@ const PRESET_PROFILES = [
   }
 ]
 
+
+
 export default function PreferencesPanel({ preferences, onSave, onClose }: PreferencesPanelProps) {
   const [localPreferences, setLocalPreferences] = useState<UserPreferences>(preferences)
   const [activeTab, setActiveTab] = useState<'quick' | 'custom'>('quick')
@@ -127,13 +129,17 @@ export default function PreferencesPanel({ preferences, onSave, onClose }: Prefe
     }, {} as UserPreferences)
   }
 
-  useEffect(() => {
-    setLocalPreferences(normalizeWeights(localPreferences))
-  }, [localPreferences])
+  // Auto-normalization removed to prevent slider check fighting
+  // useEffect(() => {
+  //   setLocalPreferences(normalizeWeights(localPreferences))
+  // }, [localPreferences])
 
   const handleWeightChange = (key: keyof UserPreferences, value: number) => {
-    const newWeights = { ...localPreferences, [key]: value / 100 }
-    setLocalPreferences(normalizeWeights(newWeights))
+    // Direct update without immediate normalization
+    setLocalPreferences(prev => ({
+      ...prev,
+      [key]: value / 100
+    }))
   }
 
   const handlePresetSelect = (preset: typeof PRESET_PROFILES[0]) => {
@@ -141,29 +147,38 @@ export default function PreferencesPanel({ preferences, onSave, onClose }: Prefe
   }
 
   const handleSave = () => {
-    onSave(normalizeWeights(localPreferences))
-    onClose()
+    try {
+      const normalized = normalizeWeights(localPreferences)
+      // Standard order - update then close
+      onSave(normalized)
+      onClose()
+    } catch (e) {
+      console.error('PreferencesPanel: Error in handleSave:', e)
+      onClose()
+    }
   }
 
   const totalWeight = Object.values(localPreferences).reduce((sum, value) => sum + value, 0)
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+      initial={{ opacity: 0, pointerEvents: "none" }}
+      animate={{ opacity: 1, pointerEvents: "auto" }}
+      exit={{ opacity: 0, pointerEvents: "none" }}
       className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-      onClick={onClose}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
     >
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
-        className="glass-card w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl border border-white/10 shadow-2xl"
+        className="glass-card w-full max-w-4xl max-h-[90vh] flex flex-col rounded-2xl border border-white/10 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-white/10 bg-white/5">
+        <div className="flex-none flex items-center justify-between p-6 border-b border-white/10 bg-white/5">
           <h3 className="text-xl font-bold text-white flex items-center gap-3">
             <span className="p-2 rounded-lg bg-gradient-to-br from-purple-600 to-pink-600">
               <AdjustmentsHorizontalIcon className="h-5 w-5 text-white" />
@@ -179,12 +194,12 @@ export default function PreferencesPanel({ preferences, onSave, onClose }: Prefe
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b border-white/10 bg-white/5">
+        <div className="flex-none flex border-b border-white/10 bg-white/5">
           <button
             onClick={() => setActiveTab('quick')}
             className={`flex-1 py-4 px-4 text-sm font-semibold transition-all relative ${activeTab === 'quick'
-                ? 'text-purple-400 bg-white/5'
-                : 'text-slate-400 hover:text-white hover:bg-white/5'
+              ? 'text-purple-400 bg-white/5'
+              : 'text-slate-400 hover:text-white hover:bg-white/5'
               }`}
           >
             Quick Presets
@@ -198,8 +213,8 @@ export default function PreferencesPanel({ preferences, onSave, onClose }: Prefe
           <button
             onClick={() => setActiveTab('custom')}
             className={`flex-1 py-4 px-4 text-sm font-semibold transition-all relative ${activeTab === 'custom'
-                ? 'text-purple-400 bg-white/5'
-                : 'text-slate-400 hover:text-white hover:bg-white/5'
+              ? 'text-purple-400 bg-white/5'
+              : 'text-slate-400 hover:text-white hover:bg-white/5'
               }`}
           >
             Custom Weights
@@ -212,7 +227,7 @@ export default function PreferencesPanel({ preferences, onSave, onClose }: Prefe
           </button>
         </div>
 
-        <div className="overflow-y-auto max-h-[calc(90vh-180px)] p-8 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto min-h-0 p-8 custom-scrollbar">
           {activeTab === 'quick' ? (
             <div className="space-y-6">
               <div>
@@ -223,34 +238,58 @@ export default function PreferencesPanel({ preferences, onSave, onClose }: Prefe
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {PRESET_PROFILES.map((preset) => (
-                  <motion.button
-                    key={preset.name}
-                    onClick={() => handlePresetSelect(preset)}
-                    className="text-left p-6 border border-white/10 bg-white/5 rounded-2xl hover:border-purple-500/50 hover:bg-white/10 transition-all group relative overflow-hidden"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-pink-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                {PRESET_PROFILES.map((preset) => {
+                  const isSelected = Object.keys(preset.weights).every(
+                    (key) => Math.abs(preset.weights[key as keyof UserPreferences] - localPreferences[key as keyof UserPreferences]) < 0.001
+                  )
 
-                    <div className="flex items-center space-x-3 mb-3 relative z-10">
-                      <span className="text-2xl">{preset.icon}</span>
-                      <h5 className="text-lg font-bold text-white group-hover:text-purple-300 transition-colors">{preset.name}</h5>
-                    </div>
-                    <p className="text-sm text-slate-400 mb-4 relative z-10">{preset.description}</p>
+                  return (
+                    <motion.button
+                      key={preset.name}
+                      onClick={() => handlePresetSelect(preset)}
+                      className={`text-left p-6 border rounded-2xl transition-all group relative overflow-hidden ${isSelected
+                        ? 'border-purple-500 bg-purple-500/10 shadow-lg shadow-purple-500/20'
+                        : 'border-white/10 bg-white/5 hover:border-purple-500/50 hover:bg-white/10'
+                        }`}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      <div className={`absolute inset-0 bg-gradient-to-br from-purple-500/5 to-pink-500/5 transition-opacity ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                        }`} />
 
-                    <div className="space-y-2 relative z-10">
-                      {PREFERENCE_DEFINITIONS.map((pref) => (
-                        <div key={pref.key} className="flex items-center justify-between">
-                          <span className="text-xs text-slate-500">{pref.label}</span>
-                          <span className="text-xs font-medium text-slate-300">
-                            {Math.round(preset.weights[pref.key] * 100)}%
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </motion.button>
-                ))}
+                      <div className="flex items-center space-x-3 mb-3 relative z-10">
+                        <span className="text-2xl">{preset.icon}</span>
+                        <h5 className={`text-lg font-bold transition-colors ${isSelected ? 'text-purple-300' : 'text-white group-hover:text-purple-300'
+                          }`}>{preset.name}</h5>
+                        {isSelected && (
+                          <motion.div
+                            layoutId="check"
+                            className="ml-auto bg-purple-500 rounded-full p-1"
+                          >
+                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </motion.div>
+                        )}
+                      </div>
+                      <p className={`text-sm mb-4 relative z-10 ${isSelected ? 'text-slate-300' : 'text-slate-400'
+                        }`}>{preset.description}</p>
+
+                      <div className="space-y-2 relative z-10">
+                        {PREFERENCE_DEFINITIONS.map((pref) => (
+                          <div key={pref.key} className="flex items-center justify-between">
+                            <span className={`text-xs ${isSelected ? 'text-slate-400' : 'text-slate-500'
+                              }`}>{pref.label}</span>
+                            <span className={`text-xs font-medium ${isSelected ? 'text-purple-200' : 'text-slate-300'
+                              }`}>
+                              {Math.round(preset.weights[pref.key] * 100)}%
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </motion.button>
+                  )
+                })}
               </div>
             </div>
           ) : (
@@ -315,7 +354,7 @@ export default function PreferencesPanel({ preferences, onSave, onClose }: Prefe
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end space-x-4 p-6 border-t border-white/10 bg-white/5">
+        <div className="flex-none flex justify-end space-x-4 p-6 border-t border-white/10 bg-white/5">
           <button
             onClick={onClose}
             className="px-6 py-3 text-slate-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors font-medium"

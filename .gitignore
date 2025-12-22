@@ -46,3 +46,10 @@ outputs/
 *.log
 log/
 logs/
+
+# Next.js
+.next/
+frontend/.next/
+out/
+build/
+dist/

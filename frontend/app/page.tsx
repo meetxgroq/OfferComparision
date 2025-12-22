@@ -39,6 +39,7 @@ export default function OfferComparePage() {
   const [showProfileModal, setShowProfileModal] = useState(false)
   const [showPreferencesModal, setShowPreferencesModal] = useState(false)
   const [showOfferModal, setShowOfferModal] = useState(false)
+  const [modalVersion, setModalVersion] = useState(0)
 
   // Load data from localStorage on component mount
   useEffect(() => {
@@ -251,7 +252,11 @@ export default function OfferComparePage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
             className="glass-card rounded-2xl p-6 relative group overflow-hidden cursor-pointer"
-            onClick={() => setShowPreferencesModal(true)}
+            onClick={(e) => {
+              e.stopPropagation()
+              setModalVersion(v => v + 1)
+              setShowPreferencesModal(true)
+            }}
           >
             <div className="absolute top-0 right-0 p-4 opacity-50 group-hover:opacity-100 transition-opacity">
               <ArrowRightIcon className="h-5 w-5 text-purple-400" />
@@ -392,6 +397,7 @@ export default function OfferComparePage() {
 
         {showPreferencesModal && (
           <PreferencesPanel
+            key={`preferences-modal-${modalVersion}`}
             preferences={preferences}
             onSave={setPreferences}
             onClose={() => setShowPreferencesModal(false)}
