@@ -47,11 +47,14 @@ export default function OfferComparePage() {
     const savedPreferences = localStorage.getItem('offercompare_preferences')
     const savedSelectedOffers = localStorage.getItem('offercompare_selected_offers')
 
+    let loadedOffers: Offer[] = []
+
     if (savedOffers) {
       try {
         const parsedOffers = JSON.parse(savedOffers)
         if (Array.isArray(parsedOffers)) {
-          setOffers(parsedOffers.map((o: any) => ({ ...o, id: String(o.id) })))
+          loadedOffers = parsedOffers.map((o: any) => ({ ...o, id: String(o.id) }))
+          setOffers(loadedOffers)
         }
       } catch (error) {
         console.error('Error loading saved offers:', error)
@@ -73,7 +76,11 @@ export default function OfferComparePage() {
       try {
         const parsedSelected = JSON.parse(savedSelectedOffers)
         if (Array.isArray(parsedSelected)) {
-          setSelectedOffers(parsedSelected.map(String))
+          // Filter selected offers to ensuring they exist in the loaded offers
+          const validSelected = parsedSelected.map(String).filter((id: string) =>
+            loadedOffers.some(offer => offer.id === id)
+          )
+          setSelectedOffers(validSelected)
         }
       } catch (error) {
         console.error('Error loading saved selected offers:', error)
