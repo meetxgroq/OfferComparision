@@ -5,7 +5,8 @@ import {
   BuildingOfficeIcon,
   MapPinIcon,
   TrashIcon,
-  CheckCircleIcon
+  CheckCircleIcon,
+  PencilSquareIcon
 } from '@heroicons/react/24/outline'
 import { Offer } from '@/types'
 
@@ -14,13 +15,15 @@ interface OfferCardsProps {
   selectedOffers: string[]
   onToggleSelection: (offerId: string) => void
   onRemoveOffer: (offerId: string) => void
+  onEditOffer: (offer: Offer) => void
 }
 
 export default function OfferCards({
   offers,
   selectedOffers,
   onToggleSelection,
-  onRemoveOffer
+  onRemoveOffer,
+  onEditOffer
 }: OfferCardsProps) {
   const getWorkTypeColor = (workType: string) => {
     switch (workType) {
@@ -62,22 +65,40 @@ export default function OfferCards({
 
           {/* Selection Indicator */}
           {selectedOffers.includes(offer.id) && (
-            <div className="absolute top-4 right-4 text-blue-400 animate-fade-in">
+            <div className="absolute top-4 right-4 text-blue-400 animate-fade-in z-20">
               <CheckCircleIcon className="h-6 w-6" />
             </div>
           )}
 
-          {/* Remove Button */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              onRemoveOffer(offer.id)
-            }}
-            className="absolute top-4 right-4 p-2 text-slate-500 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 z-10"
-            title="Remove Offer"
+          {/* Action Buttons Container */}
+          <div
+            className="absolute top-4 flex items-center space-x-2 z-30 transition-all duration-300"
+            style={{ right: selectedOffers.includes(offer.id) ? '4.5rem' : '1rem' }}
           >
-            <TrashIcon className="h-5 w-5" />
-          </button>
+            {/* Remove Button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onRemoveOffer(offer.id)
+              }}
+              className="p-2 rounded-full text-slate-500 hover:text-red-400 hover:bg-white/10 transition-all opacity-0 group-hover:opacity-100"
+              title="Remove Offer"
+            >
+              <TrashIcon className="h-5 w-5" />
+            </button>
+
+            {/* Edit Button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onEditOffer(offer)
+              }}
+              className="p-2 rounded-full text-slate-500 hover:text-cyan-400 hover:bg-white/10 transition-all opacity-0 group-hover:opacity-100"
+              title="Edit Offer"
+            >
+              <PencilSquareIcon className="h-5 w-5" />
+            </button>
+          </div>
 
           {/* Company Header */}
           <div className="flex items-start space-x-4 mb-6">

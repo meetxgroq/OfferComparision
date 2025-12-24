@@ -39,6 +39,7 @@ export default function OfferComparePage() {
   const [showProfileModal, setShowProfileModal] = useState(false)
   const [showPreferencesModal, setShowPreferencesModal] = useState(false)
   const [showOfferModal, setShowOfferModal] = useState(false)
+  const [editingOffer, setEditingOffer] = useState<Offer | undefined>(undefined)
   const [modalVersion, setModalVersion] = useState(0)
 
   // Load data from localStorage on component mount
@@ -108,8 +109,18 @@ export default function OfferComparePage() {
   }, [selectedOffers])
 
   const handleAddOffer = useCallback((newOffer: Offer) => {
-    setOffers(prev => [...prev, { ...newOffer, id: Date.now().toString() }])
+    if (editingOffer) {
+      setOffers(prev => prev.map(o => o.id === newOffer.id ? newOffer : o))
+      setEditingOffer(undefined)
+    } else {
+      setOffers(prev => [...prev, { ...newOffer, id: Date.now().toString() }])
+    }
     setShowOfferModal(false)
+  }, [editingOffer])
+
+  const handleEditOffer = useCallback((offer: Offer) => {
+    setEditingOffer(offer)
+    setShowOfferModal(true)
   }, [])
 
   const handleRemoveOffer = useCallback((offerId: string) => {
@@ -325,6 +336,7 @@ export default function OfferComparePage() {
                 selectedOffers={selectedOffers}
                 onToggleSelection={handleToggleSelection}
                 onRemoveOffer={handleRemoveOffer}
+                onEditOffer={handleEditOffer}
               />
 
               <div className="glass-card p-4 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4 border-l-4 border-l-cyan-500">
@@ -414,7 +426,11 @@ export default function OfferComparePage() {
         {showOfferModal && (
           <AdvancedOfferForm
             onSubmit={handleAddOffer}
-            onClose={() => setShowOfferModal(false)}
+            onClose={() => {
+              setShowOfferModal(false)
+              setEditingOffer(undefined)
+            }}
+            editOffer={editingOffer}
           />
         )}
       </AnimatePresence>
