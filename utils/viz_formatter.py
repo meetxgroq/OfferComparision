@@ -409,10 +409,10 @@ def format_comparison_table(offers_data):
         scores = offer.get("score_breakdown", {}).get("factor_scores", offer.get("factor_scores", {}))
         
         row = [
-            offer.get("rank", "—"),
-            offer.get("company", "—"),
-            offer.get("position", "—"),
-            offer.get("location", "—"),
+            offer.get("rank", "-"),
+            offer.get("company", "-"),
+            offer.get("position", "-"),
+            offer.get("location", "-"),
             f"{offer.get('total_score', 0):.1f}",
             f"${int(offer_data.get('base_salary', 0)):,}",
             f"${int(offer_data.get('total_compensation', offer_data.get('base_salary', 0) + offer_data.get('equity', 0) + offer_data.get('bonus', 0))):,}",

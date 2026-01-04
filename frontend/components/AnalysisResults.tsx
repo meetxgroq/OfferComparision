@@ -60,8 +60,8 @@ export default function AnalysisResults({ results }: AnalysisResultsProps) {
     labels: rankedOffers.map(o => o.company),
     datasets: [
       {
-        label: 'Adjusted Base Salary',
-        data: rankedOffers.map(o => o.offer_data?.col_adjusted_salary || o.offer_data?.base_salary || 0),
+        label: 'Base Salary',
+        data: rankedOffers.map(o => o.offer_data?.base_salary || 0),
         backgroundColor: '#06b6d4', // cyan-500
         stack: 'Stack 0',
       },
@@ -139,8 +139,8 @@ export default function AnalysisResults({ results }: AnalysisResultsProps) {
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
             className={`flex items-center space-x-2 px-6 py-4 text-sm font-medium transition-colors whitespace-nowrap ${activeTab === tab.id
-                ? 'text-cyan-400 border-b-2 border-cyan-400 bg-cyan-950/20'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+              ? 'text-cyan-400 border-b-2 border-cyan-400 bg-cyan-950/20'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
               }`}
           >
             <tab.icon className="h-4 w-4" />
@@ -330,10 +330,30 @@ export default function AnalysisResults({ results }: AnalysisResultsProps) {
                   <tbody className="divide-y divide-slate-700">
                     {[
                       { label: 'Base Salary', key: 'base_salary', format: 'currency', color: 'text-red-400' },
-                      { label: 'Adjusted Base Salary', key: 'col_adjusted_salary', format: 'currency', color: 'text-cyan-400', tooltip: 'Adjusted for cost of living differences in the offer location' },
                       { label: 'Equity', key: 'equity', format: 'currency', color: 'text-amber-400' },
                       { label: 'Bonus', key: 'bonus', format: 'currency', color: 'text-emerald-400' },
                       { label: 'Total Comp', key: 'total_compensation', format: 'currency', color: 'text-white font-bold' },
+                      {
+                        label: 'Estimated Net Pay',
+                        key: 'estimated_net_pay',
+                        format: 'currency',
+                        color: 'text-emerald-300 font-semibold',
+                        tooltip: 'Estimated take-home pay after Federal, State, and FICA taxes based on location.'
+                      },
+                      {
+                        label: 'Estimated Annual Expenses',
+                        key: 'estimated_annual_expenses',
+                        format: 'currency',
+                        color: 'text-red-300',
+                        tooltip: 'Estimated basic living expenses for a single person in this location.'
+                      },
+                      {
+                        label: 'Net Savings',
+                        key: 'net_savings',
+                        format: 'currency',
+                        color: 'text-cyan-300 font-bold',
+                        tooltip: 'Estimated potential savings (Net Pay - Annual Expenses).'
+                      },
                       // Add more metrics as needed
                     ].map((row, idx) => (
                       <tr key={idx} className="hover:bg-slate-700/30 transition-colors">

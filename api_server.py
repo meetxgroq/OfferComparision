@@ -20,7 +20,8 @@ from typing import List, Dict, Any, Optional
 from flow import get_sample_offers
 from nodes import (
     MarketResearchNode,
-    COLAdjustmentNode,
+    TaxCalculationNode,
+    COLAnalysisNode,
     MarketBenchmarkingNode,
     PreferenceScoringNode,
     AIAnalysisNode,
@@ -82,15 +83,17 @@ def health() -> Dict[str, Any]:
 
 def _build_flow() -> AsyncFlow:
     market_research = MarketResearchNode()
-    col_adjustment = COLAdjustmentNode()
+    tax_calculation = TaxCalculationNode()
+    col_analysis = COLAnalysisNode()
     market_benchmarking = MarketBenchmarkingNode()
     preference_scoring = PreferenceScoringNode()
     ai_analysis = AIAnalysisNode()
     visualization_prep = VisualizationPreparationNode()
     report_generation = ReportGenerationNode()
 
-    market_research >> col_adjustment
-    col_adjustment >> market_benchmarking
+    market_research >> tax_calculation
+    tax_calculation >> col_analysis
+    col_analysis >> market_benchmarking
     market_benchmarking >> preference_scoring
     preference_scoring >> ai_analysis
     ai_analysis >> visualization_prep

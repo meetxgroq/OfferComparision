@@ -7,7 +7,8 @@ from pocketflow import Flow, AsyncFlow
 from nodes import (
     OfferCollectionNode,
     MarketResearchNode,
-    COLAdjustmentNode,
+    TaxCalculationNode,
+    COLAnalysisNode,
     MarketBenchmarkingNode,
     PreferenceScoringNode,
     AIAnalysisNode,
@@ -22,23 +23,25 @@ def create_offer_comparison_flow():
     Flow Sequence:
     1. OfferCollection → Collect user offers and preferences (Regular Node)
     2. MarketResearch → AI-powered company intelligence (AsyncBatchNode)
-    3. COLAdjustment → Location-based compensation normalization (BatchNode)
-    4. MarketBenchmarking → Industry comparison and percentiles (AsyncBatchNode)
-    5. PreferenceScoring → Personalized weighted scoring (BatchNode)
-    6. AIAnalysis → Comprehensive AI recommendations (AsyncNode)
-    7. VisualizationPreparation → Interactive chart data (Regular Node)
-    8. ReportGeneration → Final comprehensive report (Regular Node)
+    3. TaxCalculation → Estimated Net Pay (BatchNode)
+    4. COLAnalysis → Net Savings Analysis (BatchNode)
+    5. MarketBenchmarking → Industry comparison and percentiles (AsyncBatchNode)
+    6. PreferenceScoring → Personalized weighted scoring (BatchNode)
+    7. AIAnalysis → Comprehensive AI recommendations (AsyncNode)
+    8. VisualizationPreparation → Interactive chart data (Regular Node)
+    9. ReportGeneration → Final comprehensive report (Regular Node)
     
     Returns:
         AsyncFlow: Complete OfferCompare Pro workflow with async support
     """
     
-    print("🚀 Initializing OfferCompare Pro AsyncFlow...")
+    print("Initializing OfferCompare Pro AsyncFlow...")
     
     # Create all nodes
     offer_collection = OfferCollectionNode()
     market_research = MarketResearchNode()          # AsyncBatchNode
-    col_adjustment = COLAdjustmentNode()            # BatchNode
+    tax_calculation = TaxCalculationNode()          # BatchNode
+    col_analysis = COLAnalysisNode()                # BatchNode
     market_benchmarking = MarketBenchmarkingNode()  # AsyncBatchNode
     preference_scoring = PreferenceScoringNode()    # BatchNode
     ai_analysis = AIAnalysisNode()                  # AsyncNode
@@ -47,8 +50,9 @@ def create_offer_comparison_flow():
     
     # Connect nodes in sequence (AsyncFlow supports mixed sync/async nodes)
     offer_collection >> market_research
-    market_research >> col_adjustment
-    col_adjustment >> market_benchmarking
+    market_research >> tax_calculation
+    tax_calculation >> col_analysis
+    col_analysis >> market_benchmarking
     market_benchmarking >> preference_scoring
     preference_scoring >> ai_analysis
     ai_analysis >> visualization_prep
@@ -57,7 +61,7 @@ def create_offer_comparison_flow():
     # Create AsyncFlow to handle async nodes
     flow = AsyncFlow(start=offer_collection)
     
-    print("✅ OfferCompare Pro AsyncFlow initialized successfully!")
+    print("OfferCompare Pro AsyncFlow initialized successfully!")
     return flow
 
 def create_demo_flow():

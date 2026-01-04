@@ -204,7 +204,7 @@ def call_llm(prompt: str, model: Optional[str] = None, temperature: float = 0.7,
         if len(available_providers) > 1:
             fallback_providers = [p for p in available_providers if p != provider]
             if fallback_providers:
-                print(f"⚠️ {provider} failed, trying {fallback_providers[0]}...")
+                print(f"Warning: {provider} failed, trying {fallback_providers[0]}...")
                 return call_llm(prompt, model, temperature, max_tokens, system_prompt, fallback_providers[0])
         
         raise e
@@ -266,7 +266,7 @@ def get_provider_info():
     
 if __name__ == "__main__":
     # Test the enhanced LLM interface
-    print("🔍 Testing Enhanced LLM Interface...")
+    print("Testing Enhanced LLM Interface...")
     
     # Show available providers
     provider_info = get_provider_info()
@@ -279,7 +279,7 @@ if __name__ == "__main__":
             prompt = "What are the key factors to consider when comparing job offers? Provide 3 key points."
             print(f"\nTesting with prompt: {prompt}")
             response = call_llm(prompt)
-            print(f"✅ Response received: {response[:100]}...")
+            print(f"Response received: {response[:100]}...")
             
             # Test structured output
             structured_prompt = """
@@ -288,12 +288,12 @@ if __name__ == "__main__":
             """
             print(f"\nTesting structured output...")
             structured_response = call_llm_structured(structured_prompt, response_format={"type": "json_object"})
-            print(f"✅ Structured response: {structured_response[:100]}...")
+            print(f"Structured response: {structured_response[:100]}...")
             
         except Exception as e:
-            print(f"❌ Test failed: {e}")
+            print(f"Test failed: {e}")
     else:
-        print("❌ No API keys found. Please set up your .env file with API keys.")
+        print("No API keys found. Please set up your .env file with API keys.")
 
 # Async versions for AsyncNode usage
 async def call_llm_async(prompt: str, model: Optional[str] = None, temperature: float = 0.7,

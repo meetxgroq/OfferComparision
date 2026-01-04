@@ -7,6 +7,7 @@
 **AI-Powered Career Decision Support Tool**
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![Node.js 18+](https://img.shields.io/badge/node-18+-green.svg)](https://nodejs.org/)
 [![PocketFlow](https://img.shields.io/badge/framework-PocketFlow-green.svg)](https://github.com/The-Pocket/PocketFlow)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -14,273 +15,113 @@
 
 ## 🎯 Overview
 
-OfferCompare Pro is an intelligent job offer analysis platform that helps professionals make data-driven career decisions by comparing compensation packages, work-life balance metrics, and growth opportunities across multiple offers with real-time cost of living adjustments and AI-powered recommendations.
+OfferCompare Pro is an intelligent job offer analysis platform that helps professionals make data-driven career decisions. It compares compensation packages, work-life balance metrics, and growth opportunities with real-time tax-adjusted net pay analysis and AI-powered recommendations.
 
 ### ✨ Key Features
 
-- **🏆 Comprehensive Offer Comparison** - Beyond just salary figures
-- **🌍 Cost of Living Analysis** - Real-time adjustments for fair cross-location comparisons  
-- **📊 Market Benchmarking** - Industry salary data and percentile analysis
-- **🎯 Personalized Scoring** - 11-factor weighting system based on your priorities
-- **🤖 AI-Powered Recommendations** - Comprehensive analysis and risk assessment
-- **📈 Interactive Visualizations** - Multi-dimensional charts and comparison tables
-- **📋 Professional Reports** - Actionable insights and decision frameworks
+- **🏆 Comprehensive Offer Comparison** - Multi-factor analysis beyond base salary
+- **💰 Tax & Net Pay Engine** - Estimated take-home pay analysis (Federal + State + FICA)
+- **🌍 Cost of Living Analysis** - Location-based compensation normalization  
+- **📊 Market Benchmarking** - Industry salary data and percentile comparison
+- **🎯 Personalized Scoring** - Weighted evaluation based on your specific priorities
+- **🤖 Multi-AI Analysis** - Insights powered by Google Gemini, OpenAI, or Anthropic
+- **💻 Interactive Dashboard** - Modern Next.js interface with real-time visualizations
+- **📋 Actionable Reports** - Strategic decision frameworks and negotiation tips
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-- Python 3.12+ 
-- OpenAI API key (for AI features)
-- 5-15 minutes for analysis
+- **Backend**: Python 3.10+
+- **Frontend**: Node.js 18+ and npm
+- **AI**: At least one API key (Gemini, OpenAI, or Claude)
 
 ### Installation
 
-1. **Clone the repository:**
+1. **Clone and Setup Backend:**
    ```bash
    git clone https://github.com/your-repo/OfferCompare.git
    cd OfferCompare
-   ```
-
-2. **Create and activate Conda env (recommended):**
-   ```bash
    conda env create -f environment.yml
    conda activate offercompare-pro
-   ```
-
-   Or create a venv:
-   ```bash
-   python -m venv .venv && source .venv/bin/activate
-   ```
-
-3. **Install dependencies:**
-   ```bash
    pip install -r requirements.txt
    ```
 
-4. **Set up your AI provider API key(s):**
-   ```bash
-   # One or more of the following
-   export GEMINI_API_KEY='your-gemini-key'
-   export OPENAI_API_KEY='your-openai-key'
-   export ANTHROPIC_API_KEY='your-claude-key'
-   # Optional default provider
-   export DEFAULT_AI_PROVIDER=gemini
+2. **Configure Environment:**
+   Create a `.env` file in the root directory:
+   ```env
+   GEMINI_API_KEY=your_key_here
+   OPENAI_API_KEY=your_key_here
+   ANTHROPIC_API_KEY=your_key_here
+   DEFAULT_AI_PROVIDER=gemini
    ```
 
-4. **Run OfferCompare Pro:**
+3. **Install Frontend:**
    ```bash
-   python main.py
+   cd frontend
+   npm install
+   ```
+
+### Running the Application
+
+1. **Start Backend (Terminal 1):**
+   ```bash
+   python api_server.py
+   # Runs on http://localhost:8001
+   ```
+
+2. **Start Frontend (Terminal 2):**
+   ```bash
+   cd frontend
+   npm run dev
+   # Runs on http://localhost:3000 (usually)
    ```
 
 ## 📖 How to Use
 
-### 1. Full Interactive Analysis (Recommended)
+### 1. Web Dashboard (Recommended)
+Open your browser to `http://localhost:3000` to use the interactive interface. Add offers, adjust your preferences, and generate a comprehensive AI analysis with one click.
 
+### 2. CLI Mode
+You can also run a quick demo via the terminal:
 ```bash
-python main.py
-# Select option 1: Full Interactive Analysis
-```
-
-**Process:**
-1. 📊 Define your career priorities (salary vs growth vs work-life balance)
-2. 💼 Input 2-10 job offers with comprehensive details
-3. 🔍 AI conducts market research and company analysis
-4. 📈 Get personalized recommendations and rankings
-5. 📋 Receive comprehensive report with actionable insights
-
-### 2. Quick Demo
-
-```bash
-# Non-interactive
 python main.py --demo
-
-# Interactive
-python main.py
-# Then select option 2
 ```
-
-See the full system in action with pre-loaded Google, Microsoft, and Stripe offers.
-
-### 3. Test Individual Components
-
-```bash
-python main.py
-# Select option 4: Test Utilities
-```
-
-Test individual features like:
-- 🔍 Web Research Agent
-- 💰 Cost of Living Calculator
-- 📊 Market Data Fetcher
-- 🎯 Scoring Engine
-- 🏢 Company Database
 
 ## 🏗️ Architecture
 
-Built on the **PocketFlow** framework (100-line LLM framework) with 8 specialized nodes:
+Built on the **PocketFlow** graph framework for deterministic LLM orchestration:
 
 ```mermaid
 flowchart TD
-    A[Offer Collection] --> B[Market Research]
-    B --> C[Cost of Living Adjustment]
-    C --> D[Market Benchmarking]
-    D --> E[Preference Scoring]
-    E --> F[AI Analysis]
-    F --> G[Visualization Preparation]
-    G --> H[Report Generation]
+    A[Market Research] --> B[COL & Tax Adjustment]
+    B --> C[Market Benchmarking]
+    C --> D[Preference Scoring]
+    D --> E[AI Analysis]
+    E --> F[Visualization Prep]
+    F --> G[Report Generation]
 ```
 
-### Core Components
-
-- **🔧 Utility Functions**: 7 specialized utilities for market data, cost calculations, scoring, etc.
-- **⚡ Batch Processing**: Efficient multi-offer processing using PocketFlow BatchNodes
-- **🤖 AI Integration**: OpenAI GPT-4o for company research and analysis
-- **📊 Visualization Engine**: Chart.js-compatible data formatting
-- **🏢 Company Database**: Pre-loaded data for 15+ major tech companies
-
-## 📊 Sample Analysis Output
-
-```
-🏆 TOP RECOMMENDATION: Google - Senior Software Engineer
-   Overall Score: 85.2/100 (Excellent)
-
-📊 COMPARISON SUMMARY:
-   Top choice: Google (Score: 85.2). Clear but not overwhelming lead over Microsoft (Gap: 6.7)
-
-🎯 KEY INSIGHTS:
-   • Total offers analyzed: 3
-   • Score range: 78.5 - 85.2
-   • Average score: 81.4
-
-💡 NEXT STEPS:
-   1. Review detailed analysis below
-   2. Consider negotiation opportunities
-   3. Ask clarifying questions to companies
-   4. Make your decision with confidence!
-```
+### Core Logic Structure
+- **utils/tax_calculator.py**: New engine for calculating site-specific take-home pay.
+- **nodes.py**: 7+ processing nodes for data enrichment and analysis.
+- **api_server.py**: FastAPI backend serving the analysis results.
 
 ## 🛠️ Development
 
 ### Project Structure
-
 ```
 OfferCompare/
-├── 📁 utils/           # Core utility functions
-│   ├── call_llm.py     # Enhanced LLM interface
-│   ├── web_research.py # AI company research
-│   ├── col_calculator.py # Cost of living
-│   ├── market_data.py  # Salary benchmarking
-│   ├── scoring.py      # Personalized scoring
-│   ├── viz_formatter.py # Chart data prep
-│   └── company_db.py   # Company database
-├── 📄 nodes.py         # 8 specialized processing nodes  
-├── 📄 flow.py          # Main workflow implementation
-├── 📄 main.py          # Application entry point
-├── 📁 docs/            # Documentation
-└── 📄 TODO.md          # Development progress
+├── 📁 frontend/        # Next.js React Application
+├── 📁 utils/           # Core Logic & Calculations
+│   ├── tax_calculator.py # Tax & Net Pay Engine
+│   ├── col_calculator.py # Cost of Living
+│   ├── call_llm.py     # Multi-provider LLM interface
+│   └── scoring.py      # Personalized scoring
+├── 📄 nodes.py         # PocketFlow processing nodes
+├── 📄 api_server.py    # FastAPI Backend
+└── 📄 main.py          # CLI Entry Point
 ```
-
-### Key Design Principles
-
-Following **PocketFlow Best Practices** from production experience:
-
-✅ **No try/except in node execution** - Let framework handle errors  
-✅ **Proper shared store access** - Only in prep() and post() methods  
-✅ **Batch processing** - Use BatchNode for "for each X" operations  
-✅ **Full context utilization** - No arbitrary text cropping  
-✅ **Concrete design** - Specific, actionable node responsibilities  
-
-### Adding New Features
-
-1. **New Utility Function**: Add to `utils/` directory
-2. **New Analysis Step**: Create new Node class in `nodes.py`
-3. **Extend Flow**: Update flow connection in `flow.py`
-4. **Update UI**: Modify interaction in `main.py`
-
-## 📈 Technical Features
-
-### AI & Machine Learning
-- **OpenAI GPT-4o Integration** - Company research and analysis
-- **Personalized Scoring Algorithm** - Multi-factor weighted analysis
-- **Market Intelligence** - Real-time salary and company data
-- **Risk Assessment** - Career trajectory predictions
-
-### Data & Analytics  
-- **Cost of Living Data** - 80+ global locations
-- **Market Salary Database** - Position-specific compensation ranges
-- **Company Intelligence** - Culture, benefits, and growth metrics
-- **Interactive Visualizations** - Radar charts, comparisons, breakdowns
-
-### Performance & Scalability
-- **Batch Processing** - Efficient multi-offer analysis
-- **Async Operations** - Parallel API calls for speed
-- **Caching Layer** - Optimized repeated queries (optional)
-
-#### Enable caching
-```bash
-export OFFERCOMPARE_ENABLE_CACHE=1
-export OFFERCOMPARE_CACHE_TTL=86400  # seconds
-```
-
-Cache directory can be set with `OFFERCOMPARE_CACHE_DIR` (defaults to `.cache/`).
-
-### CI
-
-GitHub Actions runs tests on every push/PR to `main` via `.github/workflows/ci.yml`.
-- **Modular Architecture** - Easy to extend and maintain
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
-
-### Development Setup
-
-1. **Fork and clone the repository**
-2. **Create a virtual environment:**
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-3. **Install development dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   pip install -e .
-   ```
-4. **Run tests:**
-   ```bash
-   pytest
-   ```
-
-## 📚 Documentation
-
-- 📖 **[Design Document](docs/design.md)** - Architecture and technical details
-- 📋 **[Development TODO](TODO.md)** - Current progress and roadmap
-- 🎯 **[User Guide](docs/user-guide.md)** - Comprehensive usage instructions
-- 🔧 **[API Reference](docs/api.md)** - Technical API documentation
 
 ## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙋 Support
-
-- 💬 **Issues**: [GitHub Issues](https://github.com/your-repo/OfferCompare/issues)
-- 📧 **Email**: support@offercompare.pro
-- 📖 **Documentation**: [Project Wiki](https://github.com/your-repo/OfferCompare/wiki)
-
-## 🏆 Acknowledgments
-
-- **[PocketFlow](https://github.com/The-Pocket/PocketFlow)** - The amazing 100-line LLM framework
-- **OpenAI** - GPT-4o for intelligent analysis
-- **The Tech Community** - For salary data and insights
-
----
-
-<div align="center">
-
-**Made with ❤️ for the tech community**
-
-[⭐ Star this repo](https://github.com/your-repo/OfferCompare) • [🐛 Report Bug](https://github.com/your-repo/OfferCompare/issues) • [💡 Request Feature](https://github.com/your-repo/OfferCompare/issues)
-
-</div>
+MIT License - Made with ❤️ for the tech community.

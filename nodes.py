@@ -6,7 +6,8 @@ Complete set of nodes for intelligent job offer analysis and comparison
 from pocketflow import Node, BatchNode, AsyncNode, AsyncBatchNode
 from utils.call_llm import call_llm, call_llm_structured, call_llm_async, call_llm_structured_async
 from utils.web_research import research_company, get_market_sentiment, research_company_async, get_market_sentiment_async
-from utils.col_calculator import calculate_col_adjustment, get_location_insights
+from utils.col_calculator import estimate_annual_expenses, get_location_insights
+from utils.tax_calculator import calculate_net_pay
 from utils.market_data import (get_compensation_insights, calculate_market_percentile, ai_market_analysis,
                               get_compensation_insights_async, calculate_market_percentile_async, ai_market_analysis_async)
 from utils.scoring import calculate_offer_score, compare_offers, customize_weights
@@ -33,18 +34,18 @@ class OfferCollectionNode(Node):
         """Collect offer information from user with comprehensive validation."""
         offers = []
         
-        print("\n🎯 Welcome to OfferCompare Pro - Intelligent Job Offer Analysis!")
+        print("\nWelcome to OfferCompare Pro - Intelligent Job Offer Analysis!")
         print("=" * 60)
         
         # Collect user preferences first
-        print("\n📊 First, let's understand your priorities...")
+        print("\nFirst, let's understand your priorities...")
         priorities = self._collect_user_priorities()
         
         # Collect offers
         num_offers = self._get_number_of_offers()
         
         for i in range(num_offers):
-            print(f"\n💼 Collecting details for Offer #{i+1}")
+            print(f"\nCollecting details for Offer #{i+1}")
             print("-" * 40)
             offer = self._collect_single_offer(i+1)
             if offer:
@@ -62,7 +63,7 @@ class OfferCollectionNode(Node):
         shared["user_preferences"] = exec_res["user_preferences"]
         shared["collection_summary"] = exec_res["collection_summary"]
         
-        print(f"\n✅ {exec_res['collection_summary']}")
+        print(f"\n{exec_res['collection_summary']}")
         return "default"
     
     def _collect_user_priorities(self):
@@ -121,7 +122,7 @@ class OfferCollectionNode(Node):
             offer["total_compensation"] = offer["base_salary"] + offer["equity"] + offer["bonus"]
             
         except ValueError:
-            print("⚠️ Invalid salary format. Please enter numbers only.")
+            print("Invalid salary format. Please enter numbers only.")
             return None
         
         # Additional details
@@ -166,7 +167,7 @@ class MarketResearchNode(AsyncBatchNode):
         Conduct AI-powered research for a single company.
         Uses async I/O for parallel processing.
         """
-        print(f"\n🔍 Conducting market research for {research_item['company']}...")
+        print(f"\nConducting market research for {research_item['company']}...")
         
         # Parallel async calls for research data
         company_research = await research_company_async(research_item["company"], research_item["position"])
@@ -200,74 +201,129 @@ class MarketResearchNode(AsyncBatchNode):
                 offer["company_db_data"] = research_data["company_db_data"]
                 offer["enriched_data"] = research_data["enriched_data"]
         
-        print(f"✅ Market research completed for {len(exec_res_list)} companies")
+        print(f"Market research completed for {len(exec_res_list)} companies")
         return "default"
 
-class COLAdjustmentNode(BatchNode):
+class TaxCalculationNode(BatchNode):
     """
-    Apply location-based compensation normalization for fair comparison.
-    Calculates cost of living adjustments for each offer.
+    Calculate estimated tax and net pay for each offer.
+    Separated from COL logic for clarity.
     """
     
     def prep(self, shared):
-        """Extract offers and user location preference."""
+        """Extract offers for tax calculation."""
+        offers = shared.get("offers", [])
+        return offers
+    
+    def exec(self, offer):
+        """Calculate tax and net pay for a single offer."""
+        print(f"\nCalculating tax for {offer['company']} ({offer['location']})...")
+        
+        # Handle Remote logic: Use base_location from user prefs if location is 'Remote'
+        # Note: In a real flow, we might want to pass user prefs explicitly, 
+        # but here we'll assume the offer might act as the container or we pass a tuple.
+        # Actually, let's keep it simple and just use the offer's location for now, 
+        # or implies we should have enriched usage of base_location.
+        # Let's fix prep to pass the base_location.
+        pass # Placeholder as we need to fix prep below
+        
+    # Re-implementing correctly with prep passing tuple
+    
+    def prep(self, shared):
+        """Extract offers and user base location."""
         offers = shared.get("offers", [])
         user_base_location = shared.get("user_preferences", {}).get("base_location", "San Francisco, CA")
         
-        adjustment_items = []
+        items = []
         for offer in offers:
-            adjustment_items.append({
-                "offer_id": offer["id"],
-                "company": offer["company"],
-                "base_salary": offer["base_salary"],
-                "total_compensation": offer["total_compensation"],
-                "location": offer["location"],
+            items.append({
+                "offer": offer,
                 "base_location": user_base_location
             })
+        return items
+
+    def exec(self, item):
+        """Calculate tax for a single offer."""
+        offer = item["offer"]
+        base_location = item["base_location"]
         
-        return adjustment_items
-    
-    def exec(self, adjustment_item):
-        """Calculate cost of living adjustments for a single offer."""
-        print(f"\n💰 Calculating cost of living adjustment for {adjustment_item['company']} ({adjustment_item['location']})...")
+        tax_location = offer["location"]
+        if "remote" in tax_location.lower():
+            tax_location = base_location
+            print(f"  -> Remote offer detected, using base location: {tax_location}")
+            
+        print(f"  -> Calculating tax for location: {tax_location}, Total Comp: ${offer['total_compensation']:,}")
         
-        salary_adjustment = calculate_col_adjustment(
-            adjustment_item["base_salary"],
-            adjustment_item["location"],
-            adjustment_item["base_location"]
+        net_pay_analysis = calculate_net_pay(
+            offer["total_compensation"],
+            tax_location
         )
-        total_comp_adjustment = calculate_col_adjustment(
-            adjustment_item["total_compensation"],
-            adjustment_item["location"],
-            adjustment_item["base_location"]
-        )
-        location_insights = get_location_insights(adjustment_item["location"])
+        
+        print(f"  -> Estimated Net Pay: ${net_pay_analysis['estimated_net_pay']:,}")
         
         return {
-            "offer_id": adjustment_item["offer_id"],
-            "salary_adjustment": salary_adjustment,
-            "total_comp_adjustment": total_comp_adjustment,
-            "location_insights": location_insights
+            "offer_id": offer["id"],
+            "net_pay_analysis": net_pay_analysis
         }
-    
+
     def post(self, shared, prep_res, exec_res_list):
-        """Update offers with cost of living adjustments."""
-        adjustment_lookup = {r.get("offer_id"): r for r in exec_res_list if isinstance(r, dict)}
+        """Update offers with tax analysis."""
+        analysis_lookup = {r["offer_id"]: r["net_pay_analysis"] for r in exec_res_list}
         
         for offer in shared["offers"]:
-            if offer["id"] in adjustment_lookup:
-                adjustment_data = adjustment_lookup[offer["id"]]
-                offer["col_adjustment"] = adjustment_data["salary_adjustment"]
-                offer["col_total_adjustment"] = adjustment_data["total_comp_adjustment"]
-                offer["location_insights"] = adjustment_data["location_insights"]
-                
-                # Add adjusted values to offer
-                offer["col_adjusted_salary"] = adjustment_data["salary_adjustment"]["adjusted_salary"]
-                offer["col_adjusted_total"] = adjustment_data["total_comp_adjustment"]["adjusted_salary"]
-                # Alias expected by some tests
-                offer["col_analysis"] = adjustment_data["salary_adjustment"]
+            if offer["id"] in analysis_lookup:
+                offer["net_pay_analysis"] = analysis_lookup[offer["id"]]
+                offer["estimated_net_pay"] = analysis_lookup[offer["id"]]["estimated_net_pay"]
         
-        print("✅ Cost of living adjustments completed")
+        print("Tax calculations completed")
+        return "default"
+
+
+class COLAnalysisNode(BatchNode):
+    """
+    Analyze Cost of Living and Savings Potential.
+    Calculates annual expenses and Net Savings.
+    """
+    
+    def prep(self, shared):
+        """Extract offers for COL analysis."""
+        return shared.get("offers", [])
+    
+    def exec(self, offer):
+        """Calculate expenses and savings for a single offer."""
+        location = offer["location"]
+        print(f"\nAnalyzing Cost of Living for {offer['company']} ({location})...")
+        
+        # Estimate Annual Expenses
+        expense_analysis = estimate_annual_expenses(location)
+        annual_expenses = expense_analysis["estimated_annual_expenses"]
+        
+        # Calculate Net Savings
+        # Net Savings = Net Pay - Annual Expenses
+        net_pay = offer.get("estimated_net_pay", 0)
+        net_savings = net_pay - annual_expenses
+        
+        print(f"  -> Annual Expenses (Est): ${annual_expenses:,}")
+        print(f"  -> Net Savings (Est): ${net_savings:,}")
+        
+        return {
+            "offer_id": offer["id"],
+            "expense_analysis": expense_analysis,
+            "net_savings": net_savings
+        }
+        
+    def post(self, shared, prep_res, exec_res_list):
+        """Update offers with COL and Savings analysis."""
+        results_lookup = {r["offer_id"]: r for r in exec_res_list}
+        
+        for offer in shared["offers"]:
+            if offer["id"] in results_lookup:
+                res = results_lookup[offer["id"]]
+                offer["expense_analysis"] = res["expense_analysis"]
+                offer["estimated_annual_expenses"] = res["expense_analysis"]["estimated_annual_expenses"]
+                offer["net_savings"] = res["net_savings"]
+                
+        print("COL and Net Savings analysis completed")
         return "default"
 
 class MarketBenchmarkingNode(AsyncBatchNode):
@@ -298,7 +354,7 @@ class MarketBenchmarkingNode(AsyncBatchNode):
     
     async def exec_async(self, benchmark_item):
         """Perform market benchmarking for a single offer using async calls."""
-        print(f"\n📊 Performing market benchmarking analysis for {benchmark_item['company']} {benchmark_item['position']}...")
+        print(f"\nPerforming market benchmarking analysis for {benchmark_item['company']} {benchmark_item['position']}...")
         
         # Parallel async calls for market data
         compensation_insights = await get_compensation_insights_async(
@@ -357,7 +413,7 @@ class MarketBenchmarkingNode(AsyncBatchNode):
                 offer["compensation_insights"] = benchmark_data["compensation_insights"]
                 offer["ai_market_analysis"] = benchmark_data["ai_analysis"]
         
-        print("✅ Market benchmarking completed")
+        print("Market benchmarking completed")
         return "default"
 
 class PreferenceScoringNode(BatchNode):
@@ -378,7 +434,7 @@ class PreferenceScoringNode(BatchNode):
         """Calculate score for a single offer with user preferences."""
         offer, user_preferences = offer_with_prefs
         
-        print(f"\n🎯 Calculating personalized score for {offer.get('company', 'Unknown')}...")
+        print(f"\nCalculating personalized score for {offer.get('company', 'Unknown')}...")
         
         # Customize weights based on user priorities  
         weights = customize_weights(user_preferences)
@@ -410,7 +466,7 @@ class PreferenceScoringNode(BatchNode):
         shared["comparison_results"] = comparison_results
         shared["scoring_weights"] = weights
         
-        print("✅ Personalized scoring completed")
+        print("Personalized scoring completed")
         return "default"
 
 class AIAnalysisNode(AsyncNode):
@@ -434,7 +490,7 @@ class AIAnalysisNode(AsyncNode):
         comparison_results = prep_data["comparison_results"]
         user_preferences = prep_data["user_preferences"]
         
-        print(f"\n🤖 Generating AI-powered analysis and recommendations...")
+        print(f"\nGenerating AI-powered analysis and recommendations...")
         
         # Prepare comprehensive data for AI analysis
         analysis_prompt = self._build_analysis_prompt(offers, comparison_results, user_preferences)
@@ -480,7 +536,7 @@ class AIAnalysisNode(AsyncNode):
         shared["ai_analysis"] = exec_res["comprehensive_analysis"]
         shared["decision_framework"] = exec_res["decision_framework"]
         
-        print("✅ AI analysis completed")
+        print("AI analysis completed")
         return "default"
     
     def _build_analysis_prompt(self, offers, comparison_results, user_preferences):
@@ -494,10 +550,13 @@ class AIAnalysisNode(AsyncNode):
         """
         
         for offer in offers:
+            net_pay = offer.get('estimated_net_pay', 0)
+            net_pay_str = f"${net_pay:,}" if net_pay > 0 else "N/A"
             prompt += f"""
         {offer.get('company', 'Unknown')} - {offer.get('position', 'Unknown')} ({offer.get('location', 'Unknown')})
         - Base Salary: ${offer.get('base_salary', 0):,}
         - Total Comp: ${offer.get('total_compensation', offer.get('base_salary', 0) + offer.get('equity', 0) + offer.get('bonus', 0)):,}
+        - Estimated Net Pay (After Tax): {net_pay_str}
         - Market Percentile: {offer.get('market_analysis', {}).get('market_percentile', 'N/A')}
         - Score: {offer.get('score_data', {}).get('total_score', 'N/A')}
         """
@@ -508,7 +567,7 @@ class AIAnalysisNode(AsyncNode):
         
         Please provide:
         1. Executive summary of the offer comparison
-        2. Detailed analysis of each offer's strengths and weaknesses
+        2. Detailed analysis of each offer's strengths and weaknesses (MANDATORY: Mention the Estimated Net Pay/Take-home salary for each offer here)
         3. Risk factors and considerations for each offer
         4. Career trajectory implications (1-5 year outlook)
         5. Negotiation opportunities and strategies
@@ -523,11 +582,17 @@ class AIAnalysisNode(AsyncNode):
     
     async def _generate_offer_recommendation_async(self, offer, user_preferences):
         """Generate specific recommendation for an individual offer using async LLM."""
+        net_pay = offer.get('estimated_net_pay', 0)
+        net_pay_str = f"${net_pay:,}" if net_pay > 0 else "N/A"
+        
         prompt = f"""
         Provide a focused recommendation for this specific offer:
         
         Company: {offer.get('company', 'Unknown')}
         Position: {offer.get('position', 'Unknown')}
+        Location: {offer.get('location', 'Unknown')}
+        Total Compensation: ${offer.get('total_compensation', 0):,}
+        Estimated Net Pay (After Tax): {net_pay_str}
         Total Score: {offer.get('score_data', {}).get('total_score', offer.get('total_score', 'N/A'))}
         
         Based on the analysis, should this offer be:
@@ -536,7 +601,7 @@ class AIAnalysisNode(AsyncNode):
         3. Neutral/Consider Carefully
         4. Not Recommended
         
-        Provide 2-3 key reasons for your recommendation.
+        Provide 2-3 key reasons for your recommendation, considering the take-home pay after taxes.
         """
         
         return await call_llm_async(prompt, temperature=0.3)
@@ -576,7 +641,7 @@ class VisualizationPreparationNode(Node):
         comparison_results = prep_data["comparison_results"]
         scoring_weights = prep_data["scoring_weights"]
         
-        print(f"\n📊 Preparing interactive visualizations...")
+        print(f"\nPreparing interactive visualizations...")
         
         ranked_offers = comparison_results.get("ranked_offers", [])
         
@@ -593,7 +658,7 @@ class VisualizationPreparationNode(Node):
         """Store visualization data."""
         shared["visualization_data"] = exec_res["visualization_data"]
         
-        print(f"✅ Prepared {exec_res['chart_count']} interactive visualizations")
+        print(f"Prepared {exec_res['chart_count']} interactive visualizations")
         return "default"
 
 class ReportGenerationNode(Node):
@@ -615,7 +680,7 @@ class ReportGenerationNode(Node):
     
     def exec(self, prep_data):
         """Generate comprehensive final report."""
-        print(f"\n📋 Generating comprehensive comparison report...")
+        print(f"\nGenerating comprehensive comparison report...")
         
         # Create structured report
         report = self._generate_structured_report(prep_data)
@@ -646,12 +711,12 @@ class ReportGenerationNode(Node):
         
         # Display executive summary
         print("\n" + "="*80)
-        print("🎯 OFFERCOMPARE PRO - EXECUTIVE SUMMARY")
+        print("OFFERCOMPARE PRO - EXECUTIVE SUMMARY")
         print("="*80)
         print(exec_res["executive_summary"])
         print("\n" + "="*80)
         
-        print("✅ Comprehensive analysis completed!")
+        print("Comprehensive analysis completed!")
         return "default"
     
     def _generate_structured_report(self, data):
@@ -708,18 +773,18 @@ class ReportGenerationNode(Node):
             return "No offers available for comparison."
         
         summary = f"""
-🏆 TOP RECOMMENDATION: {top_offer.get('company', 'N/A')} - {top_offer.get('position', 'N/A')}
+    TOP RECOMMENDATION: {top_offer.get('company', 'N/A')} - {top_offer.get('position', 'N/A')}
    Overall Score: {top_offer.get('total_score', 0):.1f}/100 ({top_offer.get('rating', 'N/A')})
 
-📊 COMPARISON SUMMARY:
+COMPARISON SUMMARY:
    {comparison_results.get('comparison_summary', 'Analysis completed')}
 
-🎯 KEY INSIGHTS:
+KEY INSIGHTS:
    • Total offers analyzed: {len(data['offers'])}
    • Score range: {data['visualization_data'].get('summary_stats', {}).get('score_range', {}).get('min', 0):.1f} - {data['visualization_data'].get('summary_stats', {}).get('score_range', {}).get('max', 0):.1f}
    • Average score: {data['visualization_data'].get('summary_stats', {}).get('avg_score', 0):.1f}
 
-💡 NEXT STEPS:
+NEXT STEPS:
    1. Review detailed analysis below
    2. Consider negotiation opportunities
    3. Ask clarifying questions to companies

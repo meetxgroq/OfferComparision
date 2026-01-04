@@ -36,7 +36,7 @@ def main():
         return run_demo_analysis(ask_confirm=False)
 
     print("\n" + "="*80)
-    print("🎯 WELCOME TO OFFERCOMPARE PRO")
+    print("WELCOME TO OFFERCOMPARE PRO")
     print("   Intelligent Job Offer Analysis & Decision Support")
     print("="*80)
     
@@ -46,7 +46,7 @@ def main():
     default_provider = provider_info.get("default_provider")
     
     if not available_providers:
-        print("\n⚠️  WARNING: No AI providers configured!")
+        print("\nWARNING: No AI providers configured!")
         print("Please set up your API keys in the .env file:")
         print("• Google Gemini: https://aistudio.google.com/app/apikey")
         print("• OpenAI: https://platform.openai.com/api-keys")
@@ -54,19 +54,19 @@ def main():
         print("\nRun 'python setup_local.py' for guided setup.")
         print("\nYou can still explore the system features, but AI analysis will be limited.")
     else:
-        print(f"\n✅ AI Providers Available: {', '.join(available_providers)}")
+        print(f"\nAI Providers Available: {', '.join(available_providers)}")
         if default_provider:
             provider_name = provider_info["provider_details"][default_provider]["name"]
-            print(f"🤖 Using: {provider_name}")
+            print(f"Using: {provider_name}")
     
     # Display options
     print("\nSelect an option:")
-    print("1. 🚀 Full Interactive Analysis (Recommended)")
-    print("2. 📊 Quick Demo with Sample Data")
-    print("3. ❓ Help & Documentation")
-    print("4. 🧪 Test Utilities")
-    print("5. ⚙️ Configuration & Setup")
-    print("6. ❌ Exit")
+    print("1. Full Interactive Analysis (Recommended)")
+    print("2. Quick Demo with Sample Data")
+    print("3. Help & Documentation")
+    print("4. Test Utilities")
+    print("5. Configuration & Setup")
+    print("6. Exit")
     print("\n(Or run 'python main.py --demo' for a non-interactive demo)")
     
     choice = input("\nEnter your choice (1-6): ").strip()
@@ -91,13 +91,13 @@ def main():
 def run_full_analysis():
     """Run the complete interactive offer comparison analysis."""
     
-    print("\n🚀 Starting Full Interactive Analysis...")
+    print("\nStarting Full Interactive Analysis...")
     print("This will guide you through collecting offer details and preferences.")
     
     # Check AI availability
     provider_info = get_provider_info()
     if not provider_info.get("available_providers"):
-        print("\n⚠️ Warning: No AI providers available for analysis.")
+        print("\nWarning: No AI providers available for analysis.")
         proceed = input("Continue with limited functionality? (y/n): ").lower()
         if proceed != 'y':
             return main()
@@ -130,7 +130,7 @@ def run_full_analysis():
         print(f"\n❌ An error occurred: {str(e)}")
         print("Please check your inputs and try again.")
         if "API" in str(e):
-            print("💡 Tip: Make sure your API keys are properly configured in .env file")
+            print("Tip: Make sure your API keys are properly configured in .env file")
 
 def run_demo_analysis(ask_confirm: bool = True):
     """Run demo analysis with sample data. If ask_confirm is False, runs non-interactively."""
@@ -141,7 +141,7 @@ def run_demo_analysis(ask_confirm: bool = True):
     # Use sample data
     shared = get_sample_offers()
     
-    print(f"\n📋 Demo includes {len(shared['offers'])} sample offers:")
+    print(f"\nDemo includes {len(shared['offers'])} sample offers:")
     for offer in shared['offers']:
         print(f"  • {offer['company']} - {offer['position']} (${offer['base_salary']:,})")
     
@@ -193,7 +193,7 @@ def run_demo_analysis(ask_confirm: bool = True):
     except Exception as e:
         print(f"\n❌ Demo error: {str(e)}")
         if "API" in str(e):
-            print("💡 Tip: Demo requires at least one AI provider configured")
+            print("Tip: Demo requires at least one AI provider configured")
 
 def show_help():
     """Display help and documentation."""
@@ -223,7 +223,7 @@ metrics, and growth opportunities across multiple offers.
 4. Let the AI analyze market data and company intelligence
 5. Review your personalized recommendations and rankings
 
-💡 TIPS FOR BEST RESULTS:
+TIPS FOR BEST RESULTS:
 • Have your offer letters ready with compensation details
 • Be honest about your priorities and preferences
 • Include equity values and vesting schedules when available

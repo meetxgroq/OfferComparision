@@ -8,10 +8,11 @@ from typing import Dict, List, Any
 
 # Default scoring weights (can be customized by user)
 DEFAULT_WEIGHTS = {
-    "base_salary": 0.25,
-    "total_compensation": 0.20,
+    "base_salary": 0.20,
+    "total_compensation": 0.15,
+    "net_savings": 0.15,
     "equity_upside": 0.15,
-    "work_life_balance": 0.15,
+    "work_life_balance": 0.10,
     "career_growth": 0.10,
     "company_culture": 0.08,
     "benefits_quality": 0.05,
@@ -59,6 +60,11 @@ SCORING_FACTORS = {
         "description": "Location desirability",
         "scale": "Personal preference (0-100)",
         "calculation": "location_score"
+    },
+    "net_savings": {
+        "description": "Estimated annual savings",
+        "scale": "Based on $100k target (0-100)",
+        "calculation": "savings_score"
     }
 }
 
@@ -215,6 +221,12 @@ def calculate_offer_score(offer_data, user_preferences=None, weights=None):
     # 8. Location Preference Score
     location = offer_data.get("location", "")
     factor_scores["location_preference"] = calculate_location_score(location, user_preferences)
+
+    # 9. Net Savings Score
+    net_savings = offer_data.get("net_savings", 0)
+    # Scale: 0 -> 0, 100k -> 100
+    savings_score = min(100, max(0, (net_savings / 100000) * 100))
+    factor_scores["net_savings"] = round(savings_score, 1)
     
     # Calculate weighted total score
     total_score = 0

@@ -85,7 +85,7 @@ COST_OF_LIVING_DATA = {
     
     # Emerging Markets
     "Mexico City, Mexico": 30.0,
-    "São Paulo, Brazil": 35.0,
+    "Sao Paulo, Brazil": 35.0,
     "Buenos Aires, Argentina": 25.0,
     "Lisbon, Portugal": 50.0,
     "Cape Town, South Africa": 28.0,
@@ -157,102 +157,32 @@ def get_cost_index(location):
     
     return COST_OF_LIVING_DATA.get(normalized_location, 75.0)  # Default for unknown locations (per tests)
 
-def calculate_col_adjustment(base_salary, from_location, to_location=None):
+BASELINE_ANNUAL_EXPENSES = 60000.0  # Baseline annual living expenses for a single person in SF
+
+def estimate_annual_expenses(location):
     """
-    Calculate cost of living adjusted salary between locations.
+    Estimate annual living expenses for a single person in a given location.
     
     Args:
-        base_salary (float): Base salary amount
-        from_location (str): Original location
-        to_location (str): Target location (optional, defaults to San Francisco)
-    
+        location (str): Location name
+        
     Returns:
-        dict: Adjustment calculation results
+        dict: Expense analysis
     """
-    if to_location is None:
-        to_location = "San Francisco, CA"
+    idx = get_cost_index(location)
     
-    from_index = get_cost_index(from_location)
-    to_index = get_cost_index(to_location)
-    
-    # Calculate adjustment factor
-    adjustment_factor = to_index / from_index
-    adjusted_salary = base_salary * adjustment_factor
-    
-    # Calculate purchasing power
-    purchasing_power_ratio = from_index / to_index
-    effective_value = base_salary * purchasing_power_ratio
+    # Calculate estimated expenses based on SF baseline
+    # Formula: Baseline * (Location_Index / 100)
+    estimated_expenses = BASELINE_ANNUAL_EXPENSES * (idx / 100.0)
     
     return {
-        "original_salary": base_salary,
-        "from_location": normalize_location(from_location),
-        "to_location": normalize_location(to_location),
-        "from_cost_index": from_index,
-        "to_cost_index": to_index,
-        "adjustment_factor": adjustment_factor,
-        "adjusted_salary": round(adjusted_salary, 2),
-        "purchasing_power_ratio": purchasing_power_ratio,
-        "effective_value": round(effective_value, 2),
-        "cost_difference_percent": round((adjustment_factor - 1) * 100, 1),
-        "savings_potential": round(base_salary - effective_value, 2) if base_salary > effective_value else 0
+        "location": normalize_location(location),
+        "cost_index": idx,
+        "estimated_annual_expenses": round(estimated_expenses, 2),
+        "baseline_expenses": BASELINE_ANNUAL_EXPENSES,
+        "relative_to_baseline": f"{idx}%"
     }
 
-def compare_purchasing_power(*args, **kwargs):
-    """
-    Compare purchasing power between locations.
-    
-    Supports two calling patterns:
-    1) compare_purchasing_power(salary, location, reference_locations=list[str])
-       -> returns a summary with comparisons list
-    2) compare_purchasing_power(salary1, location1, salary2, location2)
-       -> returns direct comparison with keys expected by tests
-    """
-    # Pattern 2: direct two-location comparison
-    if len(args) == 4 and not kwargs:
-        salary1, location1, salary2, location2 = args
-        idx1 = get_cost_index(location1)
-        idx2 = get_cost_index(location2)
-        # Effective value of salary in SF baseline terms
-        effective1 = salary1 * (idx1 / 100.0)
-        effective2 = salary2 * (idx2 / 100.0)
-        better = location1 if effective1 >= effective2 else location2
-        savings_diff = round(abs(effective1 - effective2), 2)
-        return {
-            "location1_effective": round(effective1, 2),
-            "location2_effective": round(effective2, 2),
-            "better_value": better,
-            "savings_difference": savings_diff
-        }
-    
-    # Pattern 1: one-to-many comparison
-    salary = args[0]
-    location = args[1]
-    reference_locations = args[2] if len(args) > 2 else kwargs.get("reference_locations")
-    if reference_locations is None:
-        reference_locations = [
-            "San Francisco, CA",
-            "New York, NY", 
-            "Seattle, WA",
-            "Austin, TX",
-            "Denver, CO",
-            "Remote"
-        ]
-    
-    base_index = get_cost_index(location)
-    comparisons = []
-    for ref_location in reference_locations:
-        if ref_location != location:
-            comparison = calculate_col_adjustment(salary, location, ref_location)
-            comparisons.append(comparison)
-    comparisons.sort(key=lambda x: x["effective_value"], reverse=True)
-    return {
-        "base_salary": salary,
-        "base_location": normalize_location(location),
-        "base_cost_index": base_index,
-        "comparisons": comparisons,
-        "best_value_location": comparisons[0]["to_location"] if comparisons else None,
-        "worst_value_location": comparisons[-1]["to_location"] if comparisons else None
-    }
 
 def get_location_insights(location):
     """
