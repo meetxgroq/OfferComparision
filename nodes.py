@@ -10,6 +10,7 @@ from utils.col_calculator import estimate_annual_expenses, get_location_insights
 from utils.tax_calculator import calculate_net_pay
 from utils.market_data import (get_compensation_insights, calculate_market_percentile, ai_market_analysis,
                               get_compensation_insights_async, calculate_market_percentile_async, ai_market_analysis_async)
+from utils.levels import get_universal_level_async, get_level_description
 from utils.scoring import calculate_offer_score, compare_offers, customize_weights
 from utils.viz_formatter import create_visualization_package
 from utils.company_db import get_company_data, enrich_company_data
@@ -169,24 +170,41 @@ class MarketResearchNode(AsyncBatchNode):
         """
         print(f"\nConducting market research for {research_item['company']}...")
         
-        # Parallel async calls for research data
-        company_research = await research_company_async(research_item["company"], research_item["position"])
-        market_sentiment = await get_market_sentiment_async(research_item["company"], research_item["position"])
-        
-        # These are local operations, so keep sync for now
-        company_db_data = get_company_data(research_item["company"])
-        enriched_data = enrich_company_data(research_item["company"], {
-            "position_context": research_item["position"],
-            "location": research_item["location"]
-        })
-        
-        return {
-            "offer_id": research_item["offer_id"],
-            "company_research": company_research,
-            "market_sentiment": market_sentiment,
-            "company_db_data": company_db_data,
-            "enriched_data": enriched_data
-        }
+        try:
+            # Parallel async calls for research data
+            company_research = await research_company_async(research_item["company"], research_item["position"])
+            market_sentiment = await get_market_sentiment_async(research_item["company"], research_item["position"])
+            
+            # These are local operations, so keep sync for now
+            company_db_data = get_company_data(research_item["company"])
+            enriched_data = enrich_company_data(research_item["company"], {
+                "position_context": research_item["position"],
+                "location": research_item["location"]
+            })
+            
+            return {
+                "offer_id": research_item["offer_id"],
+                "company_research": company_research,
+                "market_sentiment": market_sentiment,
+                "company_db_data": company_db_data,
+                "enriched_data": enriched_data
+            }
+        except Exception as e:
+            error_str = str(e)
+            if "429" in error_str or "Quota" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+                print(f"[INFO] Quota hit in MarketResearch. Using mock data.")
+                return {
+                    "offer_id": research_item["offer_id"],
+                    "company_research": {
+                        "summary": f"Mock research for {research_item['company']}",
+                        "metrics": {},
+                        "insights": "Mock insights"
+                    },
+                    "market_sentiment": "Positive (Mock)",
+                    "company_db_data": {},
+                    "enriched_data": {}
+                }
+            raise e
     
     async def post_async(self, shared, prep_res, exec_res_list):
         """Enrich offers with research data."""
@@ -200,6 +218,18 @@ class MarketResearchNode(AsyncBatchNode):
                 offer["market_sentiment"] = research_data["market_sentiment"]
                 offer["company_db_data"] = research_data["company_db_data"]
                 offer["enriched_data"] = research_data["enriched_data"]
+                
+                # Auto-populate grades if missing
+                metrics = research_data["company_research"].get("metrics", {})
+                
+                if not offer.get("benefits_grade") and metrics.get("benefits_score", {}).get("grade"):
+                     offer["benefits_grade"] = metrics["benefits_score"]["grade"]
+                     
+                if not offer.get("wlb_grade") and metrics.get("wlb_score", {}).get("grade"):
+                     offer["wlb_grade"] = metrics["wlb_score"]["grade"]
+                     
+                if not offer.get("growth_grade") and metrics.get("growth_score", {}).get("grade"):
+                     offer["growth_grade"] = metrics["growth_score"]["grade"]
         
         print(f"Market research completed for {len(exec_res_list)} companies")
         return "default"
@@ -342,6 +372,7 @@ class MarketBenchmarkingNode(AsyncBatchNode):
                 "offer_id": offer["id"],
                 "company": offer["company"],
                 "position": offer["position"],
+                "level": offer.get("level"),  # Captured from user input
                 "location": offer["location"],
                 "base_salary": offer["base_salary"],
                 "total_compensation": offer["total_compensation"],
@@ -356,50 +387,86 @@ class MarketBenchmarkingNode(AsyncBatchNode):
         """Perform market benchmarking for a single offer using async calls."""
         print(f"\nPerforming market benchmarking analysis for {benchmark_item['company']} {benchmark_item['position']}...")
         
-        # Parallel async calls for market data
-        compensation_insights = await get_compensation_insights_async(
-            benchmark_item["position"],
-            benchmark_item["base_salary"],
-            benchmark_item["equity"],
-            benchmark_item["bonus"],
-            benchmark_item["location"]
-        )
-        
-        base_percentile = await calculate_market_percentile_async(
-            benchmark_item["base_salary"],
-            benchmark_item["position"],
-            benchmark_item["location"]
-        )
-        
-        total_percentile = await calculate_market_percentile_async(
-            benchmark_item["total_compensation"],
-            benchmark_item["position"],
-            benchmark_item["location"]
-        )
-        
-        ai_analysis = await ai_market_analysis_async(
-            benchmark_item["position"],
-            benchmark_item["company"],
-            benchmark_item["location"],
-            {
-                "base_salary": benchmark_item["base_salary"],
-                "equity_value": benchmark_item["equity"],
-                "bonus": benchmark_item["bonus"],
-                "total_compensation": benchmark_item["total_compensation"]
+        try:
+            # 1. Determine seniority level for benchmarking
+            # This can involve an LLM call, so move it inside try/except
+            universal_level = await get_universal_level_async(
+                benchmark_item["company"], 
+                benchmark_item["level"] or "", 
+                benchmark_item["position"]
+            )
+            level_desc = get_level_description(universal_level)
+            print(f"  -> Identified seniority level: {level_desc}")
+
+            # 2. Parallel async calls for market data
+            # Passing universal_level to refine the search
+            compensation_insights = await get_compensation_insights_async(
+                benchmark_item["position"],
+                benchmark_item["base_salary"],
+                benchmark_item["equity"],
+                benchmark_item["bonus"],
+                benchmark_item["location"],
+                universal_level=universal_level
+            )
+            
+            base_percentile = await calculate_market_percentile_async(
+                benchmark_item["base_salary"],
+                benchmark_item["position"],
+                benchmark_item["location"],
+                universal_level=universal_level
+            )
+            
+            total_percentile = await calculate_market_percentile_async(
+                benchmark_item["total_compensation"],
+                benchmark_item["position"],
+                benchmark_item["location"],
+                universal_level=universal_level
+            )
+            
+            ai_analysis = await ai_market_analysis_async(
+                benchmark_item["position"],
+                benchmark_item["company"],
+                benchmark_item["location"],
+                {
+                    "base_salary": benchmark_item["base_salary"],
+                    "equity_value": benchmark_item["equity"],
+                    "bonus": benchmark_item["bonus"],
+                    "total_compensation": benchmark_item["total_compensation"],
+                    "company_level": benchmark_item["level"],
+                    "universal_level": universal_level
+                }
+            )
+            
+            # Include alias keys expected by tests
+            return {
+                "offer_id": benchmark_item["offer_id"],
+                "universal_level": universal_level,
+                "level_description": level_desc,
+                "compensation_insights": compensation_insights,
+                "market_insights": compensation_insights,
+                "base_percentile": base_percentile,
+                "market_analysis": base_percentile,
+                "total_percentile": total_percentile,
+                "total_comp_analysis": total_percentile,
+                "ai_analysis": ai_analysis
             }
-        )
-        
-        # Include alias keys expected by tests
-        return {
-            "offer_id": benchmark_item["offer_id"],
-            "compensation_insights": compensation_insights,
-            "market_insights": compensation_insights,
-            "base_percentile": base_percentile,
-            "market_analysis": base_percentile,
-            "total_percentile": total_percentile,
-            "total_comp_analysis": total_percentile,
-            "ai_analysis": ai_analysis
-        }
+        except Exception as e:
+            error_str = str(e)
+            if "429" in error_str or "Quota" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+                print(f"[INFO] Quota hit in MarketBenchmarking. Using mock data.")
+                return {
+                    "offer_id": benchmark_item["offer_id"],
+                    "universal_level": universal_level,
+                    "level_description": level_desc,
+                    "compensation_insights": "Mock compensation insights (Quota reached)",
+                    "market_insights": "Mock compensation insights (Quota reached)",
+                    "base_percentile": {"market_percentile": 50, "score": 50},
+                    "market_analysis": {"market_percentile": 50, "score": 50},
+                    "total_percentile": {"market_percentile": 50, "score": 50},
+                    "total_comp_analysis": {"market_percentile": 50, "score": 50},
+                    "ai_analysis": "Market analysis placeholder (Quota hit)"
+                }
+            raise e
     
     async def post_async(self, shared, prep_res, exec_res_list):
         """Add market benchmarking data to offers."""
@@ -496,11 +563,16 @@ class AIAnalysisNode(AsyncNode):
         analysis_prompt = self._build_analysis_prompt(offers, comparison_results, user_preferences)
         
         # Get comprehensive AI analysis with async LLM call
-        ai_analysis = await call_llm_async(
-            analysis_prompt,
-            temperature=0.3,
-            system_prompt="You are an expert career advisor and compensation analyst providing comprehensive job offer analysis."
-        )
+        try:
+            ai_analysis = await call_llm_async(
+                analysis_prompt,
+                temperature=0.3,
+                system_prompt="You are an expert career advisor and compensation analyst providing comprehensive job offer analysis."
+            )
+        except Exception as e:
+            error_str = str(e)
+            print(f"[WARNING] Main AI Analysis failed: {error_str[:100]}...")
+            ai_analysis = "Our AI is currently at capacity. Here is a summary of your data: " + comparison_results.get("comparison_summary", "Comparison available in details.")
         
         # Generate specific recommendations for each offer (async)
         offer_recommendations = []
@@ -512,7 +584,11 @@ class AIAnalysisNode(AsyncNode):
             })
         
         # Generate decision framework (async)
-        decision_framework = await self._generate_decision_framework_async(offers, comparison_results)
+        try:
+            decision_framework = await self._generate_decision_framework_async(offers, comparison_results)
+        except Exception as e:
+            print(f"[WARNING] Decision Framework AI failed: {str(e)[:100]}...")
+            decision_framework = "1. Compare Net Pay\n2. Evaluate WLB vs Growth\n3. Consider long-term career trajectory."
         
         return {
             "comprehensive_analysis": ai_analysis,
@@ -531,6 +607,15 @@ class AIAnalysisNode(AsyncNode):
         for offer in shared["offers"]:
             if offer["id"] in rec_lookup:
                 offer["ai_recommendation"] = rec_lookup[offer["id"]]
+        
+        # KEY FIX: Also update the ranked_offers list in comparison_results
+        # because the frontend uses THIS list for the dashboard, not shared["offers"]
+        if "comparison_results" in shared and "ranked_offers" in shared["comparison_results"]:
+            for ranked_offer in shared["comparison_results"]["ranked_offers"]:
+                if ranked_offer["offer_id"] in rec_lookup: # Note: ranked_offer uses 'offer_id', original uses 'id'
+                    ranked_offer["ai_recommendation"] = rec_lookup[ranked_offer["offer_id"]]
+                elif ranked_offer.get("id") in rec_lookup: # Handle case where it might use 'id'
+                    ranked_offer["ai_recommendation"] = rec_lookup[ranked_offer["id"]]
         
         # Store comprehensive analysis
         shared["ai_analysis"] = exec_res["comprehensive_analysis"]
@@ -585,8 +670,9 @@ class AIAnalysisNode(AsyncNode):
         net_pay = offer.get('estimated_net_pay', 0)
         net_pay_str = f"${net_pay:,}" if net_pay > 0 else "N/A"
         
+        # Use structured LLM call for dashboard-ready JSON
         prompt = f"""
-        Provide a focused recommendation for this specific offer:
+        Analyze this job offer and return a JSON object for the visual dashboard.
         
         Company: {offer.get('company', 'Unknown')}
         Position: {offer.get('position', 'Unknown')}
@@ -595,16 +681,94 @@ class AIAnalysisNode(AsyncNode):
         Estimated Net Pay (After Tax): {net_pay_str}
         Total Score: {offer.get('score_data', {}).get('total_score', offer.get('total_score', 'N/A'))}
         
-        Based on the analysis, should this offer be:
-        1. Strongly Recommended
-        2. Recommended with Conditions
-        3. Neutral/Consider Carefully
-        4. Not Recommended
+        User Priorities: {user_preferences}
         
-        Provide 2-3 key reasons for your recommendation, considering the take-home pay after taxes.
+        Required JSON Structure:
+        {{
+            "verdict": {{
+                "badge": "Short badge text (e.g. 'Top Pick 🏆', 'Growth Rocket 🚀', 'Safe Bet 🛡️')",
+                "color": "green/yellow/red/blue",
+                "one_line_summary": "Concise summary max 15 words"
+            }},
+            "scores": {{
+                "compensation": 1-10,
+                "work_life_balance": 1-10,
+                "growth_potential": 1-10, 
+                "job_stability": 1-10,
+                "culture_fit": 1-10
+            }},
+            "key_insights": {{
+                "pros": ["pro1", "pro2"],
+                "cons": ["con1", "con2"]
+            }}
+        }}
         """
         
-        return await call_llm_async(prompt, temperature=0.3)
+        json_str = ""
+        try:
+            # Try to get real AI analysis
+            try:
+                json_str = await call_llm_structured_async(prompt=prompt, response_format={"type": "json_object"}, temperature=0.3)
+                
+                # Cleaning step: Remove markdown code blocks if present
+                clean_str = json_str.strip()
+                if clean_str.startswith("```"):
+                    clean_str = clean_str.split("\n", 1)[1]
+                    if clean_str.endswith("```"):
+                        clean_str = clean_str.rsplit("\n", 1)[0]
+                
+                return json.loads(clean_str)
+
+            except Exception as e:
+                # Catch ALL errors here, including Rate Limits that bubble up
+                error_str = str(e)
+                print(f"[WARNING] AI Analysis failed for {offer.get('id')}: {error_str[:100]}...")
+                
+                # If it's a Quota/Rate Limit error, use Mock Data
+                if "429" in error_str or "Quota" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+                    print(f"[INFO] Quota hit (Caught in Node). Generating MOCK data.")
+                    return {
+                        "verdict": {
+                            "badge": "Mock Analysis 🛠️", 
+                            "color": "blue", 
+                            "one_line_summary": "API Quota exceeded. Showing reliable mock data for UI testing."
+                        },
+                        "scores": {
+                            "compensation": 8.5,
+                            "work_life_balance": 7.0,
+                            "growth_potential": 9.0, 
+                            "job_stability": 8.0,
+                            "culture_fit": 7.5
+                        },
+                        "key_insights": {
+                            "pros": ["Excellent base salary (Mock)", "Strong brand recognition (Mock)", "Remote options available (Mock)"],
+                            "cons": ["High cost of living area (Mock)", "Potential for burnout (Mock)"]
+                        },
+                        "financial_view": {
+                                "net_pay": 150000,
+                                "monthly_burn": 5000,
+                                "savings_rate": "45%"
+                        }
+                    }
+                raise e # Re-raise other errors to be caught effectively by outer loop or logged
+
+        except Exception as e:
+            print(f"Error parsing/generating AI recommendation: {e}")
+            # Fallback structure for non-quota errors (e.g. parsing failed)
+            return {
+                "verdict": {"badge": "Analysis Failed", "color": "gray", "one_line_summary": "Could not generate analysis suitable for visuals."},
+                "scores": {
+                    "compensation": 0,
+                    "work_life_balance": 0,
+                    "growth_potential": 0, 
+                    "job_stability": 0,
+                    "culture_fit": 0
+                },
+                "key_insights": {
+                    "pros": ["Analysis unavailable"],
+                    "cons": ["Please check logs"]
+                }
+            }
     
     async def _generate_decision_framework_async(self, offers, comparison_results):
         """Generate a decision-making framework using async LLM."""

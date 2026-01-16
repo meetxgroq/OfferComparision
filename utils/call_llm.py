@@ -23,7 +23,7 @@ AI_PROVIDERS = {
     "gemini": {
         "name": "Google Gemini",
         "env_key": "GEMINI_API_KEY", 
-        "models": ["gemini-2.5-flash", "gemini-1.5-pro", "gemini-pro"]
+        "models": ["gemini-3-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"]
     },
     "anthropic": {
         "name": "Anthropic Claude",
@@ -82,40 +82,74 @@ def call_llm_openai(prompt: str, model: str = "gpt-4o", temperature: float = 0.7
     except Exception as e:
         raise Exception(f"OpenAI API error: {str(e)}")
 
-def call_llm_gemini(prompt: str, model: str = "gemini-1.5-flash", temperature: float = 0.7,
+def call_llm_gemini(prompt: str, model: str = "gemini-2.5-flash", temperature: float = 0.7,
                    max_tokens: Optional[int] = None, system_prompt: Optional[str] = None) -> str:
-    """Call Google Gemini API."""
-    try:
-        import google.generativeai as genai
+    """
+    Call Google Gemini API with Smart Cascade Strategy.
+    Tries models in order: gemini-3-flash -> gemini-2.5-flash -> gemini-2.0-flash -> gemini-2.0-flash-lite
+    Uses the new 'google.genai' SDK.
+    """
+    from google import genai
+    from google.genai import types
+    
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        raise Exception("GEMINI_API_KEY not found.")
         
-        # Configure API key
-        genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+    client = genai.Client(api_key=api_key)
+    
+    # Define the cascade chain (High -> Low)
+    cascade_models = AI_PROVIDERS["gemini"]["models"]
+    
+    # If the requested model is not in our cascade list (e.g. customized), put it first
+    if model and model not in cascade_models:
+        cascade_models = [model] + cascade_models
+    elif model and model in cascade_models:
+        # Reorder to start with requested model, then follow the rest of the chain
+        cascade_models = [model] + [m for m in cascade_models if m != model]
         
-        # Create model instance
-        model_instance = genai.GenerativeModel(model)
-        
-        # Combine system prompt and user prompt
-        full_prompt = prompt
-        if system_prompt:
-            full_prompt = f"{system_prompt}\n\n{prompt}"
-        
-        # Configure generation
-        generation_config = {
-            "temperature": temperature,
-        }
-        if max_tokens:
-            generation_config["max_output_tokens"] = max_tokens
-        
-        # Generate response
-        response = model_instance.generate_content(
-            full_prompt,
-            generation_config=generation_config
-        )
-        
-        return response.text
-        
-    except Exception as e:
-        raise Exception(f"Gemini API error: {str(e)}")
+    last_error = None
+    
+    for current_model in cascade_models:
+        try:
+            # Configure generation config
+            config = types.GenerateContentConfig(
+                temperature=temperature,
+                max_output_tokens=max_tokens,
+                system_instruction=system_prompt
+            )
+            
+            # Generate response
+            response = client.models.generate_content(
+                model=current_model,
+                contents=prompt,
+                config=config
+            )
+            
+            if response.text:
+                 return response.text
+            return ""
+            
+        except Exception as e:
+            # Catch Rate Limits (429) for Cascade
+            # The new SDK might raise google.genai.errors.ClientError or similar
+            error_str = str(e)
+            if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str or "Quota" in error_str:
+                print(f"[QUOTA] Gemini Quota limit hit for {current_model}. Falling back to next tier...")
+                last_error = e
+                continue
+                
+            # For other errors, maybe try next model if it seems transient, but generally fail
+            # If it's a model not found error (404), definitely try next
+            if "404" in error_str or "NOT_FOUND" in error_str:
+                 print(f"[ERROR] Gemini Model {current_model} not found. Falling back...")
+                 last_error = e
+                 continue
+                 
+            raise Exception(f"Gemini API error ({current_model}): {str(e)}")
+            
+    # If we get here, all models failed
+    raise Exception(f"All Gemini models exhausted. Final error: {str(last_error)}")
 
 def call_llm_anthropic(prompt: str, model: str = "claude-3-5-sonnet-20241022", temperature: float = 0.7,
                       max_tokens: Optional[int] = None, system_prompt: Optional[str] = None) -> str:
@@ -324,6 +358,11 @@ async def call_llm_structured_async(prompt: str, response_format: Optional[Dict]
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(
         None,
-        call_llm_structured,
-        prompt, response_format, model, temperature, max_tokens, system_prompt, provider
+        lambda: call_llm_structured(
+            prompt=prompt,
+            model=model,
+            response_format=response_format,
+            system_prompt=system_prompt,
+            provider=provider
+        )
     )

@@ -24,6 +24,7 @@ import {
 } from 'chart.js'
 import ReactMarkdown from 'react-markdown'
 import type { AnalysisResults } from '@/types'
+import VisualDashboard from './VisualDashboard'
 
 // Register Chart.js components
 ChartJS.register(
@@ -82,7 +83,7 @@ export default function AnalysisResults({ results }: AnalysisResultsProps) {
 
   // radar data
   const radarData = {
-    labels: ['Salary', 'Equity', 'Bonus', 'Benefits', 'Work-Life', 'Growth', 'Role Fit', 'Overall'],
+    labels: ['Salary', 'Equity', 'Bonus', 'Benefits', 'Work-Life', 'Growth', 'Overall'],
     datasets: rankedOffers.map((offer, index) => ({
       label: offer.company,
       data: [
@@ -93,7 +94,6 @@ export default function AnalysisResults({ results }: AnalysisResultsProps) {
         offer.offer_data?.benefits_grade === 'A+' ? 10 : offer.offer_data?.benefits_grade === 'A' ? 9 : 7,
         offer.offer_data?.wlb_score || 0,
         offer.offer_data?.growth_score || 0,
-        offer.offer_data?.role_fit || 0,
         offer.total_score ? offer.total_score / 10 : 5 // Fallback
       ],
       backgroundColor: index === 0 ? 'rgba(6, 182, 212, 0.2)' : 'rgba(251, 146, 60, 0.2)',
@@ -211,19 +211,16 @@ export default function AnalysisResults({ results }: AnalysisResultsProps) {
               </div>
             </div>
 
-            {/* Offer Specific Recommendations Loop */}
-            <div className="bg-slate-800/30 p-8 rounded-xl border border-slate-700/50">
-              <h4 className="text-xl font-bold text-white mb-6">💡 Offer-Specific Recommendations</h4>
-              <div className="grid gap-6">
-                {results.final_report?.offer_rankings?.map((offer) => (
-                  <div key={offer.offer_id} className="bg-slate-900/50 p-6 rounded-lg border border-slate-700">
-                    <h5 className="text-lg font-bold text-cyan-300 mb-2">{offer.company} (Rank #{offer.rank})</h5>
-                    <div className="text-slate-300 prose prose-invert">
-                      <ReactMarkdown>{offer.ai_recommendation || ''}</ReactMarkdown>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            {/* Visual Dashboard Loop */}
+            <div className="space-y-8">
+              <h4 className="text-xl font-bold text-white mb-6 border-b border-slate-700 pb-3">🎯 Smart Analysis Dashboard</h4>
+              {rankedOffers.map((offer) => (
+                <VisualDashboard
+                  key={offer.offer_id}
+                  offer={offer}
+                  analysis={offer.ai_recommendation}
+                />
+              ))}
             </div>
 
           </motion.div>
@@ -354,6 +351,7 @@ export default function AnalysisResults({ results }: AnalysisResultsProps) {
                         color: 'text-cyan-300 font-bold',
                         tooltip: 'Estimated potential savings (Net Pay - Annual Expenses).'
                       },
+                      { label: 'Job Level', key: 'level', format: 'text', color: 'text-slate-200' },
                       // Add more metrics as needed
                     ].map((row, idx) => (
                       <tr key={idx} className="hover:bg-slate-700/30 transition-colors">

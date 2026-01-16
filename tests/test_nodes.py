@@ -12,7 +12,8 @@ import asyncio
 from nodes import (
     OfferCollectionNode,
     MarketResearchNode,
-    COLAdjustmentNode,
+    TaxCalculationNode,
+    COLAnalysisNode,
     MarketBenchmarkingNode,
     PreferenceScoringNode,
     AIAnalysisNode,
@@ -153,8 +154,8 @@ class TestMarketResearchNode:
         assert "enriched_data" in offer
 
 
-class TestCOLAdjustmentNode:
-    """Test cost of living adjustment calculations."""
+class TestCOLAnalysisNode:
+    """Test cost of living analysis and savings potential."""
     
     def setup_method(self):
         """Set up test data."""
@@ -174,31 +175,30 @@ class TestCOLAdjustmentNode:
         }
     
     def test_prep_method(self):
-        """Test preparation of adjustment items."""
-        node = COLAdjustmentNode()
+        """Test preparation of analysis items."""
+        node = COLAnalysisNode()
         # BatchNode uses regular prep
         prep_result = node.prep(self.sample_shared)
         
         assert isinstance(prep_result, list)
         assert len(prep_result) == 1
-        assert prep_result[0]["offer_id"] == "offer_1"
-        assert prep_result[0]["base_location"] == "San Francisco, CA"
+        assert prep_result[0]["id"] == "offer_1"
+        assert prep_result[0]["location"] == "Seattle, WA"
     
-    @patch('nodes.calculate_col_adjustment')
+    @patch('nodes.estimate_annual_expenses')
     @patch('nodes.get_location_insights')
-    def test_exec_method(self, mock_insights, mock_adjustment):
-        """Test COL calculation execution."""
-        mock_adjustment.return_value = {
-            "adjusted_salary": 160000,
-            "adjustment_factor": 1.067,
-            "purchasing_power_ratio": 0.94
+    def test_exec_method(self, mock_insights, mock_expense):
+        """Test COL estimation execution."""
+        mock_expense.return_value = {
+            "estimated_annual_expenses": 60000,
+            "cost_index": 75.0
         }
         mock_insights.return_value = {
             "cost_category": "High Cost",
             "analysis": "Expensive location"
         }
         
-        node = COLAdjustmentNode()
+        node = COLAnalysisNode()
         prep_result = node.prep(self.sample_shared)
         
         # BatchNode exec is called per item
@@ -209,8 +209,8 @@ class TestCOLAdjustmentNode:
         
         assert isinstance(exec_results, list)
         assert len(exec_results) == 1
-        assert "salary_adjustment" in exec_results[0]
-        assert "location_insights" in exec_results[0]
+        assert "expense_analysis" in exec_results[0]
+        assert "net_savings" in exec_results[0]
 
 
 class TestMarketBenchmarkingNode:
@@ -234,12 +234,18 @@ class TestMarketBenchmarkingNode:
             ]
         }
     
+    @patch('nodes.get_universal_level_async')
     @patch('nodes.get_compensation_insights_async')
     @patch('nodes.calculate_market_percentile_async')
     @patch('nodes.ai_market_analysis_async')
-    def test_exec_method(self, mock_ai_analysis, mock_percentile, mock_insights):
+    def test_exec_method(self, mock_ai_analysis, mock_percentile, mock_insights, mock_level):
         """Test market benchmarking execution."""
         # Use async mocks for AsyncBatchNode
+        async def mock_level_return(*args, **kwargs):
+            return 3
+        
+        mock_level.side_effect = mock_level_return
+
         async def mock_insights_return(*args, **kwargs):
             return {
                 "position_analysis": "Good fit",
@@ -478,7 +484,7 @@ class TestNodeIntegration:
     def setup_method(self):
         """Set up nodes for integration testing."""
         self.market_node = MarketResearchNode()
-        self.col_node = COLAdjustmentNode()
+        self.col_node = COLAnalysisNode()
         self.benchmark_node = MarketBenchmarkingNode()
     
     def test_data_flow_between_nodes(self):

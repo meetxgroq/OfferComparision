@@ -10,15 +10,18 @@ export interface Offer {
   work_type: 'hybrid' | 'remote' | 'onsite'
   employment_type: 'full-time' | 'part-time' | 'freelance'
   domain?: string
-  benefits_grade: 'A+' | 'A' | 'B+' | 'B' | 'C+' | 'C'
-  wlb_score: number
-  growth_score: number
-  role_fit: number
+  level?: string
+  benefits_grade?: string
+  wlb_grade?: string
+  wlb_score?: number
+  growth_grade?: string
+  growth_score?: number
+  // role_fit removed
   job_description?: string
   relocation_support?: boolean
   other_perks?: string
   total_compensation?: number
-  
+
   // Analysis results (populated after API call)
   col_adjusted_salary?: number
   market_percentile?: number
@@ -122,34 +125,34 @@ export const DOMAINS = [
 ] as const
 
 export const BENEFITS_GRADES = [
-  { 
-    value: 'A+', 
-    label: 'A+ (Exceptional)', 
-    description: 'Premium health, unlimited PTO, stock program' 
+  {
+    value: 'A+',
+    label: 'A+ (Exceptional)',
+    description: 'Premium health, unlimited PTO, stock program'
   },
-  { 
-    value: 'A', 
-    label: 'A (Excellent)', 
-    description: 'Great health, generous PTO, good perks' 
+  {
+    value: 'A',
+    label: 'A (Excellent)',
+    description: 'Great health, generous PTO, good perks'
   },
-  { 
-    value: 'B+', 
-    label: 'B+ (Good)', 
-    description: 'Standard health, reasonable PTO, some perks' 
+  {
+    value: 'B+',
+    label: 'B+ (Good)',
+    description: 'Standard health, reasonable PTO, some perks'
   },
-  { 
-    value: 'B', 
-    label: 'B (Average)', 
-    description: 'Basic health, standard PTO, minimal perks' 
+  {
+    value: 'B',
+    label: 'B (Average)',
+    description: 'Basic health, standard PTO, minimal perks'
   },
-  { 
-    value: 'C+', 
-    label: 'C+ (Below Average)', 
-    description: 'Limited health, restricted PTO' 
+  {
+    value: 'C+',
+    label: 'C+ (Below Average)',
+    description: 'Limited health, restricted PTO'
   },
-  { 
-    value: 'C', 
-    label: 'C (Poor)', 
-    description: 'Minimal benefits, no additional perks' 
+  {
+    value: 'C',
+    label: 'C (Poor)',
+    description: 'Minimal benefits, no additional perks'
   }
 ] as const

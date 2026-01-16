@@ -34,7 +34,7 @@ export default function OfferCards({
     }
   }
 
-  const getBenefitsGradeColor = (grade: string) => {
+  const getGradeColor = (grade?: string) => {
     switch (grade) {
       case 'A+': return 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
       case 'A': return 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
@@ -107,7 +107,14 @@ export default function OfferCards({
             </div>
             <div className="flex-1 min-w-0">
               <h3 className="text-lg font-bold text-white truncate group-hover:text-cyan-200 transition-colors">{offer.company}</h3>
-              <p className="text-sm text-slate-400 truncate">{offer.position}</p>
+              <div className="flex items-center gap-2 mt-1">
+                <p className="text-sm text-slate-400 truncate">{offer.position}</p>
+                {offer.level && (
+                  <span className="px-1.5 py-0.5 text-[10px] font-bold bg-white/10 text-cyan-300 border border-white/10 rounded uppercase tracking-wider">
+                    {offer.level}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -159,26 +166,24 @@ export default function OfferCards({
 
           {/* Ratings */}
           <div className="grid grid-cols-3 gap-2 mb-4">
-            <div className="p-2 rounded-lg bg-white/5 text-center border border-white/5">
-              <div className="text-sm font-bold text-white">{offer.wlb_score}/10</div>
-              <div className="text-[10px] uppercase tracking-wider text-slate-500 mt-1">WLB</div>
+            <div className={`p-2 rounded-lg text-center ${getGradeColor(offer.benefits_grade)}`}>
+              <div className="text-sm font-bold">
+                {offer.benefits_grade || 'N/A'}
+              </div>
+              <div className="text-[10px] uppercase tracking-wider opacity-70 mt-1">Benefits</div>
             </div>
-            <div className="p-2 rounded-lg bg-white/5 text-center border border-white/5">
-              <div className="text-sm font-bold text-white">{offer.growth_score}/10</div>
-              <div className="text-[10px] uppercase tracking-wider text-slate-500 mt-1">Growth</div>
+            <div className={`p-2 rounded-lg text-center ${getGradeColor(offer.wlb_grade)}`}>
+              <div className="text-sm font-bold">
+                {offer.wlb_grade || 'N/A'}
+              </div>
+              <div className="text-[10px] uppercase tracking-wider opacity-70 mt-1">WLB</div>
             </div>
-            <div className="p-2 rounded-lg bg-white/5 text-center border border-white/5">
-              <div className="text-sm font-bold text-white">{offer.role_fit}/10</div>
-              <div className="text-[10px] uppercase tracking-wider text-slate-500 mt-1">Fit</div>
+            <div className={`p-2 rounded-lg text-center ${getGradeColor(offer.growth_grade)}`}>
+              <div className="text-sm font-bold">
+                {offer.growth_grade || 'N/A'}
+              </div>
+              <div className="text-[10px] uppercase tracking-wider opacity-70 mt-1">Growth</div>
             </div>
-          </div>
-
-          {/* Benefits Grade */}
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium uppercase tracking-wider text-slate-500">Benefits</span>
-            <span className={`px-3 py-0.5 text-xs font-bold rounded-full ${getBenefitsGradeColor(offer.benefits_grade)}`}>
-              Grade {offer.benefits_grade}
-            </span>
           </div>
 
           {/* Analysis Results (if available) */}

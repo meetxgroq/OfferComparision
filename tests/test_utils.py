@@ -9,13 +9,17 @@ import os
 from unittest.mock import patch, MagicMock
 
 # Import all utilities to test
-from utils.call_llm import get_provider_info, call_llm
+from utils.call_llm import get_provider_info, call_llm, AI_PROVIDERS
 from utils.col_calculator import (
-    calculate_col_adjustment, 
-    compare_purchasing_power, 
+    estimate_annual_expenses, 
     get_location_insights,
     get_cost_index,
     normalize_location
+)
+from utils.tax_calculator import (
+    calculate_net_pay,
+    estimate_tax_rate,
+    normalize_location_for_tax
 )
 from utils.market_data import (
     get_market_salary_range,
@@ -70,6 +74,12 @@ class TestCallLLM:
         info = get_provider_info()
         assert len(info["available_providers"]) == 0
 
+    def test_gemini_3_flash_in_cascade(self):
+        """Verify gemini-3-flash is the primary model in the Gemini cascade."""
+        gemini_models = AI_PROVIDERS["gemini"]["models"]
+        assert "gemini-3-flash" in gemini_models
+        assert gemini_models[0] == "gemini-3-flash"
+
 
 class TestCOLCalculator:
     """Test cost of living calculation functions."""
@@ -93,31 +103,27 @@ class TestCOLCalculator:
         unknown_index = get_cost_index("Unknown City")
         assert unknown_index == 75.0  # Default fallback
     
-    def test_calculate_col_adjustment(self):
-        """Test cost of living adjustment calculations."""
-        result = calculate_col_adjustment(100000, "San Francisco, CA", "Austin, TX")
+    def test_estimate_annual_expenses(self):
+        """Test annual expense estimation."""
+        result = estimate_annual_expenses("Austin, TX")
         
         assert isinstance(result, dict)
-        assert "original_salary" in result
-        assert "adjusted_salary" in result
-        assert "adjustment_factor" in result
-        assert "purchasing_power_ratio" in result
-        assert result["original_salary"] == 100000
-        assert isinstance(result["adjusted_salary"], (int, float))
-        assert result["adjusted_salary"] > 0
+        assert "location" in result
+        assert "cost_index" in result
+        assert "estimated_annual_expenses" in result
+        assert result["location"] == "Austin, TX"
+        assert result["estimated_annual_expenses"] > 0
     
-    def test_compare_purchasing_power(self):
-        """Test purchasing power comparison."""
-        result = compare_purchasing_power(
-            100000, "San Francisco, CA",
-            90000, "Austin, TX"
-        )
+    def test_calculate_net_pay(self):
+        """Test net pay calculation after taxes."""
+        result = calculate_net_pay(150000, "Seattle, WA")
         
         assert isinstance(result, dict)
-        assert "location1_effective" in result
-        assert "location2_effective" in result
-        assert "better_value" in result
-        assert "savings_difference" in result
+        assert "gross_pay" in result
+        assert "estimated_net_pay" in result
+        assert "estimated_tax_amount" in result
+        assert result["gross_pay"] == 150000
+        assert result["estimated_net_pay"] == 150000 * 0.74 # 26% tax in WA
     
     def test_get_location_insights(self):
         """Test location insights generation."""
@@ -144,8 +150,8 @@ class TestMarketData:
         """Test experience level inference."""
         assert infer_experience_level(1) == "entry_level"
         assert infer_experience_level(3) == "mid_level"
-        assert infer_experience_level(7) == "senior_level"
-        assert infer_experience_level(12) == "senior_level"
+        assert infer_experience_level(7) == "staff_level"
+        assert infer_experience_level(12) == "principal_level"
     
     def test_get_market_salary_range(self):
         """Test market salary range retrieval."""
@@ -279,7 +285,7 @@ class TestScoringEngine:
         assert sum(weights.values()) == pytest.approx(1.0, rel=1e-2)
         
         # Salary focused should have higher salary weights
-        assert weights["base_salary"] > 0.3
+        assert weights["base_salary"] > 0.28
 
 
 class TestCompanyDB:

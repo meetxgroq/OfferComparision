@@ -77,12 +77,12 @@ def research_company(company_name, position=None, research_topics=None):
     
     {research_analysis}
     
-    Provide scores (1-10 scale) and brief explanations for:
+    Provide scores (1-10 scale) AND letter grades (A+, A, B+, B, C, D, F) where applicable:
     {{
         "culture_score": {{"score": X, "explanation": "brief reason"}},
-        "wlb_score": {{"score": X, "explanation": "brief reason"}},
-        "growth_score": {{"score": X, "explanation": "brief reason"}},
-        "benefits_score": {{"score": X, "explanation": "brief reason"}},
+        "wlb_score": {{"score": X, "grade": "Letter Grade", "explanation": "brief reason"}},
+        "growth_score": {{"score": X, "grade": "Letter Grade", "explanation": "brief reason"}},
+        "benefits_score": {{"score": X, "grade": "Letter Grade", "explanation": "brief reason"}},
         "stability_score": {{"score": X, "explanation": "brief reason"}},
         "reputation_score": {{"score": X, "explanation": "brief reason"}},
         "innovation_score": {{"score": X, "explanation": "brief reason"}},
@@ -114,9 +114,9 @@ def research_company(company_name, position=None, research_topics=None):
         # Fallback to default scores if parsing fails
         metrics = {
             "culture_score": {"score": 7, "explanation": "Analysis not available"},
-            "wlb_score": {"score": 7, "explanation": "Analysis not available"},
-            "growth_score": {"score": 7, "explanation": "Analysis not available"},
-            "benefits_score": {"score": 7, "explanation": "Analysis not available"},
+            "wlb_score": {"score": 7, "grade": "B", "explanation": "Analysis not available"},
+            "growth_score": {"score": 7, "grade": "B", "explanation": "Analysis not available"},
+            "benefits_score": {"score": 7, "grade": "B", "explanation": "Analysis not available"},
             "stability_score": {"score": 7, "explanation": "Analysis not available"},
             "reputation_score": {"score": 7, "explanation": "Analysis not available"},
             "innovation_score": {"score": 7, "explanation": "Analysis not available"},

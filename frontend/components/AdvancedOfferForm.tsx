@@ -11,6 +11,7 @@ import {
   CurrencyDollarIcon
 } from '@heroicons/react/24/outline'
 import { Offer, WORK_TYPES, EMPLOYMENT_TYPES, DOMAINS, BENEFITS_GRADES } from '@/types'
+import { POPULAR_COMPANIES } from '@/data/companies'
 import FileUpload from './FileUpload'
 import Slider from './Slider'
 
@@ -33,16 +34,21 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
     work_type: editOffer?.work_type || 'hybrid',
     employment_type: editOffer?.employment_type || 'full-time',
     domain: editOffer?.domain || '',
+    level: editOffer?.level || '',
     benefits_grade: editOffer?.benefits_grade || 'B',
+    wlb_grade: editOffer?.wlb_grade || '',
     wlb_score: editOffer?.wlb_score || 7,
+    growth_grade: editOffer?.growth_grade || '',
     growth_score: editOffer?.growth_score || 7,
-    role_fit: editOffer?.role_fit || 7,
+    // role_fit removed
     job_description: editOffer?.job_description || '',
     relocation_support: editOffer?.relocation_support || false,
     other_perks: editOffer?.other_perks || ''
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isUploading, setIsUploading] = useState(false)
+  const [suggestions, setSuggestions] = useState<typeof POPULAR_COMPANIES>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
 
   const validateForm = useCallback(() => {
     const newErrors: Record<string, string> = {}
@@ -56,6 +62,100 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
     return Object.keys(newErrors).length === 0
   }, [formData])
 
+  const getScoreFromGrade = (grade: string): number => {
+    switch (grade) {
+      case 'A+': return 10
+      case 'A': return 9
+      case 'B+': return 8
+      case 'B': return 8
+      case 'C+': return 7
+      case 'C': return 6
+      case 'D': return 4
+      case 'F': return 2
+      default: return 7
+    }
+  }
+
+  const handleCompanyChange = (value: string) => {
+    handleInputChange('company', value)
+
+    // Auto-suggest logic
+    if (value.trim().length > 0) {
+      const matches = POPULAR_COMPANIES.filter(c =>
+        c.name.toLowerCase().includes(value.toLowerCase())
+      )
+      setSuggestions(matches)
+      setShowSuggestions(true)
+    } else {
+      setSuggestions([])
+      setShowSuggestions(false)
+    }
+
+    // Auto-populate logic (Exact match)
+    const match = POPULAR_COMPANIES.find(c => c.name.toLowerCase() === value.toLowerCase())
+    if (match) {
+      setFormData(prev => ({
+        ...prev,
+        company: match.name,
+        benefits_grade: match.benefits_grade,
+        wlb_grade: match.wlb_grade,
+        wlb_score: getScoreFromGrade(match.wlb_grade),
+        growth_grade: match.growth_grade,
+        growth_score: getScoreFromGrade(match.growth_grade),
+      }))
+      if (match.levels) {
+        setLevelSuggestions(match.levels)
+      }
+    } else {
+      setLevelSuggestions([])
+    }
+  }
+
+  const [levelSuggestions, setLevelSuggestions] = useState<string[]>(() => {
+    if (editOffer?.company) {
+      const match = POPULAR_COMPANIES.find(c => c.name.toLowerCase() === editOffer.company.toLowerCase())
+      return match?.levels || []
+    }
+    return []
+  })
+  const [showLevelSuggestions, setShowLevelSuggestions] = useState(false)
+
+  const handleSelectCompany = (name: string) => {
+    handleCompanyChange(name)
+    setShowSuggestions(false)
+
+    // Also prepare level suggestions
+    const match = POPULAR_COMPANIES.find(c => c.name.toLowerCase() === name.toLowerCase())
+    if (match && match.levels) {
+      setLevelSuggestions(match.levels)
+    } else {
+      setLevelSuggestions([])
+    }
+  }
+
+  const handleSelectLevel = (level: string) => {
+    handleInputChange('level', level)
+    setShowLevelSuggestions(false)
+  }
+
+
+
+  const handleGradeChange = (field: 'wlb_grade' | 'growth_grade' | 'benefits_grade', value: string) => {
+    // Update the grade
+    setFormData(prev => {
+      const updates: any = { [field]: value }
+
+      // Also update the corresponding score if it's WLB or Growth
+      if (field === 'wlb_grade') {
+        updates.wlb_score = getScoreFromGrade(value)
+      } else if (field === 'growth_grade') {
+        updates.growth_score = getScoreFromGrade(value)
+      }
+
+      return { ...prev, ...updates }
+    })
+  }
+
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault()
 
@@ -67,6 +167,7 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
       id: editOffer?.id || Date.now().toString(),
       company: formData.company!,
       position: formData.position!,
+      level: formData.level,
       location: formData.location!,
       base_salary: formData.base_salary!,
       equity: formData.equity || 0,
@@ -76,9 +177,11 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
       employment_type: formData.employment_type!,
       domain: formData.domain,
       benefits_grade: formData.benefits_grade!,
+      wlb_grade: formData.wlb_grade,
       wlb_score: formData.wlb_score!,
+      growth_grade: formData.growth_grade,
       growth_score: formData.growth_score!,
-      role_fit: formData.role_fit!,
+      // role_fit removed
       job_description: formData.job_description,
       relocation_support: formData.relocation_support,
       other_perks: formData.other_perks,
@@ -215,14 +318,50 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium text-slate-300 mb-2">Company *</label>
-                    <input
-                      type="text"
-                      value={formData.company || ''}
-                      onChange={(e) => handleInputChange('company', e.target.value)}
-                      className={`w-full px-4 py-3 bg-white/5 border rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all ${errors.company ? 'border-red-500/50 focus:ring-red-500' : 'border-white/10 hover:border-white/20'
-                        }`}
-                      placeholder="e.g., Google, Microsoft"
-                    />
+                    <div className="relative group">
+                      <input
+                        type="text"
+                        value={formData.company || ''}
+                        onChange={(e) => handleCompanyChange(e.target.value)}
+                        onFocus={() => {
+                          if (formData.company && formData.company.length > 0) {
+                            setShowSuggestions(true)
+                          }
+                        }}
+                        onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                        className={`w-full px-4 py-3 bg-white/5 border rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all ${errors.company ? 'border-red-500/50 focus:ring-red-500' : 'border-white/10 hover:border-white/20'
+                          }`}
+                        placeholder="e.g., Google, Microsoft"
+                        autoComplete="off"
+                      />
+
+                      {/* Custom Autocomplete Dropdown */}
+                      {showSuggestions && suggestions.length > 0 && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="absolute z-50 left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-xl shadow-xl overflow-hidden max-h-60 overflow-y-auto custom-scrollbar ring-1 ring-white/5"
+                        >
+                          {suggestions.map((company) => (
+                            <button
+                              key={company.name}
+                              type="button"
+                              className="w-full text-left px-4 py-3 text-sm text-slate-300 hover:text-white hover:bg-cyan-500/20 transition-colors flex items-center justify-between group/item"
+                              onMouseDown={(e) => {
+                                e.preventDefault() // Prevent blur
+                                handleSelectCompany(company.name)
+                              }}
+                            >
+                              <span className="font-medium">{company.name}</span>
+                              <div className="flex space-x-2 text-[10px] uppercase opacity-50 group-hover/item:opacity-100 transition-opacity">
+                                {company.wlb_grade && <span className="px-1.5 py-0.5 rounded bg-white/5 border border-white/5">WLB: {company.wlb_grade}</span>}
+                                {company.growth_grade && <span className="px-1.5 py-0.5 rounded bg-white/5 border border-white/5">Growth: {company.growth_grade}</span>}
+                              </div>
+                            </button>
+                          ))}
+                        </motion.div>
+                      )}
+                    </div>
                     {errors.company && <p className="mt-1 text-sm text-red-400">{errors.company}</p>}
                   </div>
 
@@ -250,6 +389,50 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
                       placeholder="e.g., San Francisco, CA"
                     />
                     {errors.location && <p className="mt-1 text-sm text-red-400">{errors.location}</p>}
+                  </div>
+
+                  <div className="relative group">
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Job Level (e.g. 61, IC3)</label>
+                    <input
+                      type="text"
+                      value={formData.level || ''}
+                      onChange={(e) => handleInputChange('level', e.target.value)}
+                      onFocus={() => {
+                        if (levelSuggestions.length > 0) {
+                          setShowLevelSuggestions(true)
+                        }
+                      }}
+                      onBlur={() => setTimeout(() => setShowLevelSuggestions(false), 200)}
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all hover:border-white/20"
+                      placeholder="Optional company level"
+                      autoComplete="off"
+                    />
+
+                    {/* Level Suggestions Dropdown */}
+                    {showLevelSuggestions && levelSuggestions.length > 0 && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="absolute z-50 left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-xl shadow-xl overflow-hidden max-h-60 overflow-y-auto custom-scrollbar ring-1 ring-white/5"
+                      >
+                        <div className="px-3 py-2 text-[10px] uppercase font-bold text-slate-500 border-b border-white/5">
+                          Common {formData.company} Levels
+                        </div>
+                        {levelSuggestions.map((level) => (
+                          <button
+                            key={level}
+                            type="button"
+                            className="w-full text-left px-4 py-3 text-sm text-slate-300 hover:text-white hover:bg-cyan-500/10 transition-colors"
+                            onMouseDown={(e) => {
+                              e.preventDefault()
+                              handleSelectLevel(level)
+                            }}
+                          >
+                            {level}
+                          </button>
+                        ))}
+                      </motion.div>
+                    )}
                   </div>
 
                   <div>
@@ -368,29 +551,34 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
                 </div>
 
                 <div className="space-y-4">
-                  <h4 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Subjective Ratings (1-10)</h4>
+                  <h4 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Grading & Ratings</h4>
                   <div className="bg-white/5 p-4 rounded-xl border border-white/10 space-y-6">
-                    <Slider
-                      label="Work-Life Balance"
-                      value={formData.wlb_score || 7}
-                      onChange={(value) => handleInputChange('wlb_score', value)}
-                      min={1} max={10}
-                      description="1=Poor, 10=Excellent"
-                    />
-                    <Slider
-                      label="Growth Opportunity"
-                      value={formData.growth_score || 7}
-                      onChange={(value) => handleInputChange('growth_score', value)}
-                      min={1} max={10}
-                      description="1=Limited, 10=Unlimited"
-                    />
-                    <Slider
-                      label="Role Fit"
-                      value={formData.role_fit || 7}
-                      onChange={(value) => handleInputChange('role_fit', value)}
-                      min={1} max={10}
-                      description="1=Poor fit, 10=Perfect match"
-                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">WLB Grade</label>
+                        <select
+                          value={formData.wlb_grade || ''}
+                          onChange={(e) => handleGradeChange('wlb_grade', e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-800 border border-white/10 rounded-lg text-white text-sm"
+                        >
+                          <option value="">Auto/None</option>
+                          {BENEFITS_GRADES.map(g => <option key={g.value} value={g.value}>{g.value}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">Growth Grade</label>
+                        <select
+                          value={formData.growth_grade || ''}
+                          onChange={(e) => handleGradeChange('growth_grade', e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-800 border border-white/10 rounded-lg text-white text-sm"
+                        >
+                          <option value="">Auto/None</option>
+                          {BENEFITS_GRADES.map(g => <option key={g.value} value={g.value}>{g.value}</option>)}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Sliders removed as per user request - scores are inferred from grades */}
                   </div>
                 </div>
               </div>

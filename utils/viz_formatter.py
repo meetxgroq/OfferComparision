@@ -391,6 +391,7 @@ def format_comparison_table(offers_data):
     headers = [
         "Rank",
         "Company",
+        "Level",
         "Position", 
         "Location",
         "Total Score",
@@ -411,6 +412,7 @@ def format_comparison_table(offers_data):
         row = [
             offer.get("rank", "-"),
             offer.get("company", "-"),
+            offer_data.get("level", "-"),
             offer.get("position", "-"),
             offer.get("location", "-"),
             f"{offer.get('total_score', 0):.1f}",
@@ -435,27 +437,40 @@ def _find_best_values(rows, offers_data):
     if not rows:
         return {}
     
-    best_indices = {}
-    
-    # Total Score (highest)
-    score_col = 4
-    max_score = max(float(row[score_col]) for row in rows)
-    for i, row in enumerate(rows):
-        if float(row[score_col]) == max_score:
-            best_indices[f"{i},{score_col}"] = "highest_score"
-    
-    # Base Salary (highest)
-    salary_col = 5
+    import re
     def _num(s: str) -> float:
         # Extract numeric, allow decimals
-        val = re.sub(r"[^0-9.\-]", "", s)
+        if not s or s == '-':
+            return 0.0
+        val = re.sub(r"[^0-9.\-]", "", str(s))
         try:
             return float(val)
         except Exception:
             return 0.0
 
-    max_salary = max(_num(row[salary_col]) for row in rows)
-    for i, row in enumerate(rows):
+    best_indices = {}
+    
+    # Total Score (highest)
+    score_col = 4
+    try:
+        max_score = max(_num(row[score_col]) for row in rows)
+        if max_score > 0:
+            for i, row in enumerate(rows):
+                if _num(row[score_col]) == max_score:
+                    best_indices[f"{i},{score_col}"] = "highest_score"
+    except (ValueError, IndexError):
+        pass
+    
+    # Base Salary (highest)
+    salary_col = 5
+    try:
+        max_salary = max(_num(row[salary_col]) for row in rows)
+        if max_salary > 0:
+            for i, row in enumerate(rows):
+                if _num(row[salary_col]) == max_salary:
+                    best_indices[f"{i},{salary_col}"] = "highest_comp"
+    except (ValueError, IndexError):
+        pass
         if _num(row[salary_col]) == max_salary:
             best_indices[f"{i},{salary_col}"] = "highest_value"
     

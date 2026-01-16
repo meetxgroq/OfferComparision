@@ -166,6 +166,32 @@ def calculate_location_score(location, user_preferences):
     
     return 50  # Neutral score for unspecified locations
 
+# Grade to Score Mapping
+GRADE_TO_SCORE = {
+    "A+": 100, "A": 96, "A-": 92,
+    "B+": 88, "B": 84, "B-": 80,
+    "C+": 78, "C": 74, "C-": 70,
+    "D+": 68, "D": 64, "D-": 60,
+    "F": 50
+}
+
+def _convert_grade_to_score(grade_or_score):
+    """Convert a letter grade or numeric score to a 0-100 float."""
+    if isinstance(grade_or_score, (int, float)):
+        return float(grade_or_score)
+    if isinstance(grade_or_score, str):
+        # normalize
+        cleaned = grade_or_score.upper().strip()
+        # Handle "8/10" or "8" strings
+        try:
+            val = float(cleaned)
+            if val <= 10: return val * 10
+            return val
+        except ValueError:
+            pass
+        return GRADE_TO_SCORE.get(cleaned, 75.0) # Default to C/B border
+    return 0.0
+
 def calculate_offer_score(offer_data, user_preferences=None, weights=None):
     """
     Calculate comprehensive score for a job offer.
@@ -203,20 +229,34 @@ def calculate_offer_score(offer_data, user_preferences=None, weights=None):
     factor_scores["equity_upside"] = calculate_equity_score(equity_value, company_stage, stability_score)
     
     # 4. Work-Life Balance Score
-    wlb_data = company_data.get("metrics", {}).get("wlb_score", {})
-    factor_scores["work_life_balance"] = wlb_data.get("score", 7) * 10  # Convert 1-10 to 0-100
+    # Check for direct grade user input first, then company metrics
+    wlb_input = offer_data.get("wlb_grade")
+    if wlb_input:
+        factor_scores["work_life_balance"] = _convert_grade_to_score(wlb_input)
+    else:
+        wlb_data = company_data.get("metrics", {}).get("wlb_score", {})
+        factor_scores["work_life_balance"] = wlb_data.get("score", 7) * 10  # Convert 1-10 to 0-100
     
     # 5. Career Growth Score
-    growth_data = company_data.get("metrics", {}).get("growth_score", {})
-    factor_scores["career_growth"] = growth_data.get("score", 7) * 10
+    growth_input = offer_data.get("growth_grade")
+    if growth_input:
+        factor_scores["career_growth"] = _convert_grade_to_score(growth_input)
+    else:
+        growth_data = company_data.get("metrics", {}).get("growth_score", {})
+        factor_scores["career_growth"] = growth_data.get("score", 7) * 10
     
     # 6. Company Culture Score
+    # Culture is less often graded explicitly by user, usually inferred or rated 1-10
     culture_data = company_data.get("metrics", {}).get("culture_score", {})
     factor_scores["company_culture"] = culture_data.get("score", 7) * 10
     
     # 7. Benefits Quality Score
-    benefits_data = company_data.get("metrics", {}).get("benefits_score", {})
-    factor_scores["benefits_quality"] = benefits_data.get("score", 7) * 10
+    benefits_input = offer_data.get("benefits_grade")
+    if benefits_input:
+        factor_scores["benefits_quality"] = _convert_grade_to_score(benefits_input)
+    else:
+        benefits_data = company_data.get("metrics", {}).get("benefits_score", {})
+        factor_scores["benefits_quality"] = benefits_data.get("score", 7) * 10
     
     # 8. Location Preference Score
     location = offer_data.get("location", "")

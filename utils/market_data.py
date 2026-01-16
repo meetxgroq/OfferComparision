@@ -188,17 +188,18 @@ def normalize_position_title(position):
     # Title-case fallback for unknown titles
     return " ".join([w.capitalize() for w in lower.split()])
 
-def infer_experience_level(position, years_experience=None):
+def infer_experience_level(position, years_experience=None, universal_level=None):
     """
-    Infer experience level from position title and years of experience.
-    
-    Args:
-        position (str): Position title
-        years_experience (int): Years of experience
-    
-    Returns:
-        str: Experience level
+    Infer experience level from position title, years of experience, or universal level.
     """
+    # 1. Prioritize universal level if provided
+    if universal_level is not None:
+        if universal_level <= 1: return "entry_level"
+        if universal_level == 2: return "mid_level"
+        if universal_level == 3: return "senior_level"
+        if universal_level == 4: return "staff_level"
+        return "principal_level"
+
     # Overload: if position is actually a number, treat as years_experience
     if isinstance(position, (int, float)) and years_experience is None:
         years_experience = int(position)
@@ -206,7 +207,7 @@ def infer_experience_level(position, years_experience=None):
     else:
         position_lower = str(position).lower()
     
-    # Direct inference from title
+    # 2. Direct inference from title
     if "principal" in position_lower or "distinguished" in position_lower:
         return "principal_level"
     elif "staff" in position_lower:
@@ -220,9 +221,13 @@ def infer_experience_level(position, years_experience=None):
     elif "manager" in position_lower:
         return "senior_level"
     
-    # Use years of experience if available
+    # 3. Use years of experience if available
     if years_experience is not None:
-        if years_experience >= 5:
+        if years_experience >= 10:
+            return "principal_level"
+        elif years_experience >= 7:
+            return "staff_level"
+        elif years_experience >= 5:
             return "senior_level"
         elif years_experience >= 2:
             return "mid_level"
@@ -232,7 +237,7 @@ def infer_experience_level(position, years_experience=None):
     # Default to mid-level if unclear
     return "mid_level"
 
-def get_market_salary_range(position, location="San Francisco, CA", experience_level=None, years_experience=None):
+def get_market_salary_range(position, location="San Francisco, CA", experience_level=None, years_experience=None, universal_level=None):
     """
     Get market salary range for a position and location.
     
@@ -241,6 +246,7 @@ def get_market_salary_range(position, location="San Francisco, CA", experience_l
         location (str): Location
         experience_level (str): Experience level override
         years_experience (int): Years of experience
+        universal_level (int): Universal seniority level (1-8)
     
     Returns:
         dict: Market salary data
@@ -248,7 +254,7 @@ def get_market_salary_range(position, location="San Francisco, CA", experience_l
     normalized_position = normalize_position_title(position)
     
     if experience_level is None:
-        experience_level = infer_experience_level(normalized_position, years_experience)
+        experience_level = infer_experience_level(normalized_position, years_experience, universal_level)
     
     # Get base salary data
     position_data = MARKET_SALARY_DATA.get(normalized_position)
@@ -284,20 +290,11 @@ def get_market_salary_range(position, location="San Francisco, CA", experience_l
         "market_data_source": "comprehensive_industry_data"
     }
 
-def calculate_market_percentile(salary, position, location="San Francisco, CA", experience_level=None):
+def calculate_market_percentile(salary, position, location="San Francisco, CA", experience_level=None, universal_level=None):
     """
     Calculate what percentile a salary represents in the market.
-    
-    Args:
-        salary (float): Salary to analyze
-        position (str): Position title
-        location (str): Location
-        experience_level (str): Experience level
-    
-    Returns:
-        dict: Percentile analysis
     """
-    market_data = get_market_salary_range(position, location, experience_level)
+    market_data = get_market_salary_range(position, location, experience_level, universal_level=universal_level)
     salary_range = market_data["adjusted_range"]
     
     # Calculate percentile and category aligned with tests
@@ -340,35 +337,22 @@ def calculate_market_percentile(salary, position, location="San Francisco, CA", 
         "gap_to_max": salary_range["max"] - salary
     }
 
-def get_compensation_insights(position, base_salary=None, equity_value=0, bonus=0, location="San Francisco, CA", years_experience=None):
+def get_compensation_insights(position, base_salary=None, equity_value=0, bonus=0, location="San Francisco, CA", years_experience=None, universal_level=None):
     """
     Get comprehensive compensation insights and market analysis.
-    
-    Args:
-        position (str): Position title
-        base_salary (float): Base salary
-        equity_value (float): Annual equity value
-        bonus (float): Annual bonus
-        location (str): Location
-    
-    Returns:
-        dict: Comprehensive compensation analysis
     """
-    # Flexible argument handling to support alternate call orders from tests
-    # If base_salary seems like a location string and equity_value is a number, adjust order
+    # Flexible argument handling...
     if isinstance(base_salary, str) and isinstance(equity_value, (int, float)):
-        # Called as (position, location, base_salary, years_experience?)
         location, base_salary = base_salary, equity_value
-        # years_experience may be passed via 'bonus' positionally
         if isinstance(bonus, (int, float)) and years_experience is None:
             years_experience = int(bonus)
             bonus = 0
     
     total_compensation = (base_salary or 0) + equity_value + bonus
     
-    # Get market analysis for base and total
-    base_analysis = calculate_market_percentile(base_salary or 0, position, location)
-    total_analysis = calculate_market_percentile(total_compensation, position, location)
+    # Get market analysis using universal_level
+    base_analysis = calculate_market_percentile(base_salary or 0, position, location, universal_level=universal_level)
+    total_analysis = calculate_market_percentile(total_compensation, position, location, universal_level=universal_level)
     
     # Calculate compensation breakdown (avoid div by zero)
     comp_breakdown = {
@@ -479,23 +463,23 @@ async def get_market_salary_range_async(position, location="San Francisco, CA"):
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(None, get_market_salary_range, position, location)
 
-async def calculate_market_percentile_async(salary, position, location="San Francisco, CA", experience_level=None):
-    """Async version of calculate_market_percentile for use with AsyncNode."""
+async def calculate_market_percentile_async(salary, position, location="San Francisco, CA", experience_level=None, universal_level=None):
+    """Async version of calculate_market_percentile."""
     import asyncio
     loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, calculate_market_percentile, salary, position, location, experience_level)
+    return await loop.run_in_executor(None, calculate_market_percentile, salary, position, location, experience_level, universal_level)
 
-async def get_compensation_insights_async(position, base_salary, equity, bonus, location="San Francisco, CA"):
-    """Async version of get_compensation_insights for use with AsyncNode."""
+async def get_compensation_insights_async(position, base_salary, equity, bonus, location="San Francisco, CA", universal_level=None):
+    """Async version of get_compensation_insights."""
     import asyncio
     loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, get_compensation_insights, position, base_salary, equity, bonus, location)
+    return await loop.run_in_executor(None, get_compensation_insights, position, base_salary, equity, bonus, location, None, universal_level)
 
-async def ai_market_analysis_async(position, location, salary, experience_years):
+async def ai_market_analysis_async(position, company, location, salary_data):
     """Async version of ai_market_analysis for use with AsyncNode."""
     import asyncio
     loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, ai_market_analysis, position, location, salary, experience_years)
+    return await loop.run_in_executor(None, ai_market_analysis, position, company, location, salary_data)
 
 if __name__ == "__main__":
     # Test market data functions
