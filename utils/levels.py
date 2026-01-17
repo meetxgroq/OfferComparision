@@ -72,7 +72,15 @@ COMPANY_LEVEL_MAP = {
             "E6 (Staff)": 4, "E7 (Senior Staff)": 5, "E8 (Principal)": 6, "E9 (Distinguished)": 7,
             "ICT3": 2, "ICT4": 3, "ICT5": 4, "ICT6": 5
         },
-        "Management & Exec": {"M1 (Manager)": 3, "M2 (Sr Manager)": 4, "D1 (Director)": 5, "D2 (Sr Director)": 6, "VP": 7}
+        "Management & Exec": {
+            "M0": 2,
+            "M1": 3, 
+            "M2": 4, 
+            "D1": 5, 
+            "D2": 6, 
+            "VP1": 7,
+            "VP2": 8
+        }
     },
     "Amazon": {
         "Engineering": {
@@ -100,7 +108,15 @@ COMPANY_LEVEL_MAP = {
             "ICT2 (SWE I)": 1, "ICT3 (SWE II)": 2, "ICT4 (Senior)": 3, 
             "ICT5 (Staff)": 4, "ICT6 (Principal)": 5, "ICT7 (Distinguished)": 6
         },
-        "Management & Exec": {"M1 (Manager)": 3, "M2 (Sr Manager)": 4, "M3 (Director)": 5, "M4 (Sr Director)": 6}
+        "Management & Exec": {
+            "M1 / Manager 1": 3,
+            "M2 / Manager 2": 4,
+            "M3 / Senior Manager": 5,
+            "D1 / Director": 6,
+            "D2 / Senior Director": 7,
+            "VP": 8,
+            "SVP": 9
+        }
     },
     "Linkedin": {
         "Engineering": {
@@ -138,6 +154,25 @@ COMPANY_LEVEL_MAP = {
         "Management & Exec": {"M3 (Manager)": 3, "M4 (Sr Manager)": 4, "M5 (Director)": 5, "M6 (Sr Director)": 6}
     }
 }
+
+COMPANY_ALIASES = {
+    "Meta (Facebook)": "Meta",
+    "Facebook": "Meta",
+    "Apple Inc.": "Apple",
+    "Google (Alphabet)": "Google",
+    "Alphabet": "Google"
+}
+
+def normalize_company(company: str) -> str:
+    """Normalize company name using aliases and standard casing."""
+    c = company.strip()
+    # Check aliases first (exact case-insensitive match preferred if possible)
+    for alias, standard in COMPANY_ALIASES.items():
+        if c.lower() == alias.lower():
+            return standard
+            
+    # Default to Title Case
+    return c.title()
 
 ROLE_PILLARS = [
     "Engineering",
@@ -262,7 +297,7 @@ async def get_universal_level_async(company: str, company_level: str, position: 
     Map a company-specific level to the universal level scale (Async version with AI fallback and caching).
     """
     # Normalize inputs
-    company_clean = company.strip().title()
+    company_clean = normalize_company(company)
     level_clean = company_level.strip().upper()
     pillar = detect_pillar(position)
     
@@ -303,7 +338,7 @@ def get_universal_level(company: str, company_level: str, position: str = "Softw
     """
     Sync version (no AI fallback).
     """
-    company_clean = company.strip().title()
+    company_clean = normalize_company(company)
     level_clean = company_level.strip().upper()
     pillar = detect_pillar(position)
     
@@ -318,7 +353,7 @@ def get_universal_level(company: str, company_level: str, position: str = "Softw
 
 def get_level_suggestions(company: str, position: str = "Software Engineer") -> List[str]:
     """Get common levels for a specific company and position pillar, sorted by seniority."""
-    company_clean = company.strip().title()
+    company_clean = normalize_company(company)
     pillar = detect_pillar(position)
     
     if company_clean in COMPANY_LEVEL_MAP:
