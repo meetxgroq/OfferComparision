@@ -10,7 +10,7 @@ export interface CompanyData {
 export const POPULAR_COMPANIES: CompanyData[] = [
     // MAANG / Big Tech
     { name: 'Google', benefits_grade: 'A+', wlb_grade: 'B+', growth_grade: 'A+', levels: ['L3', 'L4', 'L5', 'L6', 'L7', 'L8'] },
-    { name: 'Microsoft', benefits_grade: 'A', wlb_grade: 'A', growth_grade: 'A', levels: ['59', '60', '61', '62', '63', '64', '65', '66', '67'] },
+    { name: 'Microsoft', benefits_grade: 'A', wlb_grade: 'A', growth_grade: 'A', levels: ['59', '60', '61', '62', '63', '64', '65', '66', '67', '64 / Senior Manager', 'Principal EM', 'Partner', 'VP'] },
     { name: 'Meta (Facebook)', benefits_grade: 'A+', wlb_grade: 'B', growth_grade: 'A+', levels: ['E3', 'E4', 'E5', 'E6', 'E7', 'E8', 'E9'] },
     { name: 'Apple', benefits_grade: 'A', wlb_grade: 'B', growth_grade: 'A', levels: ['ICT2', 'ICT3', 'ICT4', 'ICT5', 'ICT6'] },
     { name: 'Amazon', benefits_grade: 'B+', wlb_grade: 'C+', growth_grade: 'A+', levels: ['L4', 'L5', 'L6', 'L7', 'L8'] },

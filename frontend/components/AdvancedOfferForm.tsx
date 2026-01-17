@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import {
   XMarkIcon,
@@ -49,6 +49,29 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
   const [isUploading, setIsUploading] = useState(false)
   const [suggestions, setSuggestions] = useState<typeof POPULAR_COMPANIES>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
+
+  // Position Autocomplete State
+  const [positionSuggestions, setPositionSuggestions] = useState<string[]>([])
+  const [filteredPositions, setFilteredPositions] = useState<string[]>([])
+  const [showPositionSuggestions, setShowPositionSuggestions] = useState(false)
+
+  // Fetch positions on mount
+  useEffect(() => {
+    const fetchPositions = async () => {
+      try {
+        const res = await fetch('http://localhost:8001/api/positions');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.positions) {
+            setPositionSuggestions(data.positions);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to fetch positions", e);
+      }
+    };
+    fetchPositions();
+  }, []);
 
   const validateForm = useCallback(() => {
     const newErrors: Record<string, string> = {}
@@ -111,26 +134,45 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
     }
   }
 
-  const [levelSuggestions, setLevelSuggestions] = useState<string[]>(() => {
-    if (editOffer?.company) {
-      const match = POPULAR_COMPANIES.find(c => c.name.toLowerCase() === editOffer.company.toLowerCase())
-      return match?.levels || []
-    }
-    return []
-  })
+  // Dynamic Level Suggestions via API
+  const [levelSuggestions, setLevelSuggestions] = useState<string[]>([])
   const [showLevelSuggestions, setShowLevelSuggestions] = useState(false)
+
+  // Fetch levels when company or position changes
+  useEffect(() => {
+    const fetchLevels = async () => {
+      if (!formData.company) return;
+
+      try {
+        const queryParams = new URLSearchParams({
+          company: formData.company,
+          position: formData.position || "Software Engineer"
+        });
+
+        const res = await fetch(`http://localhost:8001/api/levels?${queryParams}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.levels && data.levels.length > 0) {
+            setLevelSuggestions(data.levels);
+            return;
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch levels:", error);
+      }
+
+      // Fallback to static data if API fails or returns empty
+      const match = POPULAR_COMPANIES.find(c => c.name.toLowerCase() === formData.company?.toLowerCase());
+      setLevelSuggestions(match?.levels || []);
+    };
+
+    const timeoutId = setTimeout(fetchLevels, 500); // Debounce 500ms
+    return () => clearTimeout(timeoutId);
+  }, [formData.company, formData.position]);
 
   const handleSelectCompany = (name: string) => {
     handleCompanyChange(name)
     setShowSuggestions(false)
-
-    // Also prepare level suggestions
-    const match = POPULAR_COMPANIES.find(c => c.name.toLowerCase() === name.toLowerCase())
-    if (match && match.levels) {
-      setLevelSuggestions(match.levels)
-    } else {
-      setLevelSuggestions([])
-    }
   }
 
   const handleSelectLevel = (level: string) => {
@@ -367,14 +409,64 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
 
                   <div>
                     <label className="block text-sm font-medium text-slate-300 mb-2">Position *</label>
-                    <input
-                      type="text"
-                      value={formData.position || ''}
-                      onChange={(e) => handleInputChange('position', e.target.value)}
-                      className={`w-full px-4 py-3 bg-white/5 border rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all ${errors.position ? 'border-red-500/50 focus:ring-red-500' : 'border-white/10 hover:border-white/20'
-                        }`}
-                      placeholder="e.g., Senior Software Engineer"
-                    />
+                    <div className="relative group">
+                      <input
+                        type="text"
+                        value={formData.position || ''}
+                        onChange={(e) => {
+                          const val = e.target.value
+                          handleInputChange('position', val)
+                          if (val.trim().length > 0) {
+                            const matches = positionSuggestions.filter(p => p.toLowerCase().includes(val.toLowerCase()))
+                            setFilteredPositions(matches)
+                            setShowPositionSuggestions(true)
+                          } else {
+                            setShowPositionSuggestions(false)
+                          }
+                        }}
+                        onFocus={() => {
+                          if (positionSuggestions.length > 0 && formData.position) {
+                            const matches = positionSuggestions.filter(p => p.toLowerCase().includes(formData.position!.toLowerCase()))
+                            setFilteredPositions(matches)
+                            setShowPositionSuggestions(true)
+                          } else if (positionSuggestions.length > 0 && !formData.position) {
+                            setFilteredPositions(positionSuggestions) // Show all if empty
+                            setShowPositionSuggestions(true)
+                          }
+                        }}
+                        onBlur={() => setTimeout(() => setShowPositionSuggestions(false), 200)}
+                        className={`w-full px-4 py-3 bg-white/5 border rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all ${errors.position ? 'border-red-500/50 focus:ring-red-500' : 'border-white/10 hover:border-white/20'
+                          }`}
+                        placeholder="e.g., Senior Software Engineer"
+                        autoComplete="off"
+                      />
+                      {/* Position Suggestions Dropdown */}
+                      {showPositionSuggestions && filteredPositions.length > 0 && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="absolute z-50 left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-xl shadow-xl overflow-hidden max-h-60 overflow-y-auto custom-scrollbar ring-1 ring-white/5"
+                        >
+                          <div className="px-3 py-2 text-[10px] uppercase font-bold text-slate-500 border-b border-white/5">
+                            Common Positions
+                          </div>
+                          {filteredPositions.map((pos) => (
+                            <button
+                              key={pos}
+                              type="button"
+                              className="w-full text-left px-4 py-3 text-sm text-slate-300 hover:text-white hover:bg-cyan-500/10 transition-colors"
+                              onMouseDown={(e) => {
+                                e.preventDefault()
+                                handleInputChange('position', pos)
+                                setShowPositionSuggestions(false)
+                              }}
+                            >
+                              {pos}
+                            </button>
+                          ))}
+                        </motion.div>
+                      )}
+                    </div>
                     {errors.position && <p className="mt-1 text-sm text-red-400">{errors.position}</p>}
                   </div>
 

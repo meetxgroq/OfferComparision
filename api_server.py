@@ -83,6 +83,23 @@ def health() -> Dict[str, Any]:
     return {"status": "ok", "providers": provider_info}
 
 
+from utils.levels import get_level_suggestions
+
+@app.get("/api/levels", response_model=Dict[str, List[str]])
+def get_levels(company: str, position: str = "Software Engineer") -> Dict[str, List[str]]:
+    """Get common levels for a specific company and position."""
+    # Force reload
+    levels = get_level_suggestions(company, position)
+    return {"levels": levels}
+
+from utils.positions import get_all_positions
+
+@app.get("/api/positions", response_model=Dict[str, List[str]])
+def get_positions() -> Dict[str, List[str]]:
+    """Get all common position suggestions."""
+    return {"positions": get_all_positions()}
+
+
 def _build_flow() -> AsyncFlow:
     market_research = MarketResearchNode()
     tax_calculation = TaxCalculationNode()

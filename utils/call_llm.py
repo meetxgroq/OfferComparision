@@ -23,7 +23,7 @@ AI_PROVIDERS = {
     "gemini": {
         "name": "Google Gemini",
         "env_key": "GEMINI_API_KEY", 
-        "models": ["gemini-3-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"]
+        "models": ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"]
     },
     "anthropic": {
         "name": "Anthropic Claude",
@@ -223,6 +223,7 @@ def call_llm(prompt: str, model: Optional[str] = None, temperature: float = 0.7,
 
         if cache_enabled:
             return cached_call("llm", ttl, cache_key_parts)(_dispatch)()
+        
         if provider == "openai":
             return call_llm_openai(prompt, model, temperature, max_tokens, system_prompt)
         elif provider == "gemini":
@@ -269,13 +270,22 @@ def call_llm_structured(prompt: str, model: Optional[str] = None, response_forma
         if "json" not in prompt.lower():
             prompt += "\n\nFormat your response as JSON."
     
-    return call_llm(
+    raw_response = call_llm(
         prompt, 
         model=model,
         temperature=0.3,  # Lower temperature for structured output
         system_prompt=system_prompt,
         provider=provider
     )
+    
+    # Extract JSON if wrapped in markdown code blocks
+    if "```" in raw_response:
+        import re
+        json_match = re.search(r"```(?:json)?\s*(.*?)\s*```", raw_response, re.DOTALL)
+        if json_match:
+            return json_match.group(1).strip()
+            
+    return raw_response.strip()
 
 def get_provider_info():
     """Get information about available AI providers."""

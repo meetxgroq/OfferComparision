@@ -198,7 +198,9 @@ def infer_experience_level(position, years_experience=None, universal_level=None
         if universal_level == 2: return "mid_level"
         if universal_level == 3: return "senior_level"
         if universal_level == 4: return "staff_level"
-        return "principal_level"
+        if universal_level == 5: return "principal_level"
+        if universal_level == 6: return "distinguished_level"
+        return "director_level"
 
     # Overload: if position is actually a number, treat as years_experience
     if isinstance(position, (int, float)) and years_experience is None:
