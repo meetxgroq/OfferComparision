@@ -103,8 +103,9 @@ flowchart TD
 ```
 
 ### Core Logic Structure
-- **utils/tax_calculator.py**: New engine for calculating site-specific take-home pay.
-- **nodes.py**: 7+ processing nodes for data enrichment and analysis.
+- **utils/tax_calculator.py**: Engine for calculating site-specific take-home pay.
+- **utils/call_llm.py**: Multi-provider LLM interface with smart retry logic and model cascade (Gemini, OpenAI, Claude).
+- **nodes.py**: 7+ processing nodes for data enrichment and analysis with parallel async execution.
 - **api_server.py**: FastAPI backend serving the analysis results.
 
 ## 🛠️ Development

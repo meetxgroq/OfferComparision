@@ -5,6 +5,8 @@ Supports OpenAI GPT, Google Gemini, and Anthropic Claude with automatic fallback
 
 import os
 import json
+import re
+import time
 from typing import Optional, Dict, Any
 from dotenv import load_dotenv
 from .config import get_config
@@ -23,7 +25,7 @@ AI_PROVIDERS = {
     "gemini": {
         "name": "Google Gemini",
         "env_key": "GEMINI_API_KEY", 
-        "models": ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"]
+        "models": ["gemini-3-flash-preview", "gemini-2.5-flash", "gemini-2.5-flash-lite"]
     },
     "anthropic": {
         "name": "Anthropic Claude",
@@ -86,8 +88,9 @@ def call_llm_gemini(prompt: str, model: str = "gemini-2.5-flash", temperature: f
                    max_tokens: Optional[int] = None, system_prompt: Optional[str] = None) -> str:
     """
     Call Google Gemini API with Smart Cascade Strategy.
-    Tries models in order: gemini-3-flash -> gemini-2.5-flash -> gemini-2.0-flash -> gemini-2.0-flash-lite
+    Tries models in order: gemini-3-flash -> gemini-2.5-flash -> gemini-2.5-flash-lite
     Uses the new 'google.genai' SDK.
+    Implements smart retry logic: retries on RPM limits, falls back on RPD limits.
     """
     from google import genai
     from google.genai import types
@@ -110,43 +113,157 @@ def call_llm_gemini(prompt: str, model: str = "gemini-2.5-flash", temperature: f
         
     last_error = None
     
-    for current_model in cascade_models:
+    def _parse_retry_delay(error_obj):
+        """Extract retry delay from error details."""
         try:
-            # Configure generation config
-            config = types.GenerateContentConfig(
-                temperature=temperature,
-                max_output_tokens=max_tokens,
-                system_instruction=system_prompt
-            )
+            # Error might be a dict with 'error' key or have 'details' attribute
+            error_data = error_obj
+            if hasattr(error_obj, '__dict__'):
+                error_data = error_obj.__dict__
+            elif isinstance(error_obj, str):
+                # Try to parse as JSON if it's a string representation
+                try:
+                    error_data = json.loads(error_obj)
+                except:
+                    # Extract from error message string
+                    match = re.search(r'Please retry in ([\d.]+)s', error_obj)
+                    if match:
+                        return float(match.group(1))
+                    return None
             
-            # Generate response
-            response = client.models.generate_content(
-                model=current_model,
-                contents=prompt,
-                config=config
-            )
+            # Check if it's a dict with 'error' key
+            if isinstance(error_data, dict) and 'error' in error_data:
+                error_data = error_data['error']
             
-            if response.text:
-                 return response.text
-            return ""
+            # Extract details array
+            details = None
+            if isinstance(error_data, dict):
+                details = error_data.get('details', [])
+            elif hasattr(error_obj, 'details'):
+                details = error_obj.details
             
-        except Exception as e:
-            # Catch Rate Limits (429) for Cascade
-            # The new SDK might raise google.genai.errors.ClientError or similar
-            error_str = str(e)
-            if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str or "Quota" in error_str:
-                print(f"[QUOTA] Gemini Quota limit hit for {current_model}. Falling back to next tier...")
-                last_error = e
-                continue
+            if not details:
+                return None
+            
+            # Find RetryInfo in details
+            for detail in details:
+                if isinstance(detail, dict) and detail.get('@type') == 'type.googleapis.com/google.rpc.RetryInfo':
+                    retry_delay_str = detail.get('retryDelay', '')
+                    if retry_delay_str:
+                        # Parse "26s" or "26.2s" format
+                        match = re.search(r'([\d.]+)s?', str(retry_delay_str))
+                        if match:
+                            return float(match.group(1))
+            return None
+        except Exception:
+            return None
+    
+    def _parse_quota_type(error_obj):
+        """Determine if error is RPM or RPD limit based on quotaId."""
+        try:
+            error_data = error_obj
+            if hasattr(error_obj, '__dict__'):
+                error_data = error_obj.__dict__
+            elif isinstance(error_obj, str):
+                try:
+                    error_data = json.loads(error_obj)
+                except:
+                    # Check error message for quota type
+                    if 'PerMinute' in error_obj:
+                        return 'RPM'
+                    elif 'PerDay' in error_obj:
+                        return 'RPD'
+                    return None
+            
+            if isinstance(error_data, dict) and 'error' in error_data:
+                error_data = error_data['error']
+            
+            details = None
+            if isinstance(error_data, dict):
+                details = error_data.get('details', [])
+            elif hasattr(error_obj, 'details'):
+                details = error_obj.details
+            
+            if not details:
+                return None
+            
+            # Find QuotaFailure in details
+            for detail in details:
+                if isinstance(detail, dict) and detail.get('@type') == 'type.googleapis.com/google.rpc.QuotaFailure':
+                    violations = detail.get('violations', [])
+                    for violation in violations:
+                        quota_id = violation.get('quotaId', '')
+                        # Check for RPD first (permanent for the day)
+                        if 'PerDay' in quota_id:
+                            return 'RPD'
+                        elif 'PerMinute' in quota_id:
+                            return 'RPM'
+            return None
+        except Exception:
+            return None
+    
+    for current_model in cascade_models:
+        retry_attempted = False
+        while True:  # Loop for retry logic
+            try:
+                # Configure generation config
+                config = types.GenerateContentConfig(
+                    temperature=temperature,
+                    max_output_tokens=max_tokens,
+                    system_instruction=system_prompt
+                )
                 
-            # For other errors, maybe try next model if it seems transient, but generally fail
-            # If it's a model not found error (404), definitely try next
-            if "404" in error_str or "NOT_FOUND" in error_str:
-                 print(f"[ERROR] Gemini Model {current_model} not found. Falling back...")
-                 last_error = e
-                 continue
-                 
-            raise Exception(f"Gemini API error ({current_model}): {str(e)}")
+                # Generate response
+                response = client.models.generate_content(
+                    model=current_model,
+                    contents=prompt,
+                    config=config
+                )
+                
+                if response.text:
+                    return response.text
+                return ""
+                
+            except Exception as e:
+                # Catch Rate Limits (429) for Smart Retry/Fallback
+                error_str = str(e)
+                is_rate_limit = "429" in error_str or "RESOURCE_EXHAUSTED" in error_str or "Quota" in error_str
+                
+                if is_rate_limit:
+                    # Parse error to determine type and retry delay
+                    quota_type = _parse_quota_type(e)
+                    retry_delay = _parse_retry_delay(e)
+                    
+                    # Determine if RPD limit (permanent for the day)
+                    if quota_type == 'RPD':
+                        print(f"[RPD_LIMIT] Daily quota exhausted for {current_model}. Falling back to next model...")
+                        last_error = e
+                        break  # Exit retry loop, move to next model
+                    
+                    # For RPM limits, retry same model after delay
+                    elif quota_type == 'RPM' and retry_delay and not retry_attempted:
+                        print(f"[RPM_LIMIT] Rate limit hit for {current_model}. Retrying after {retry_delay:.1f}s...")
+                        time.sleep(retry_delay)
+                        retry_attempted = True
+                        continue  # Retry same model
+                    
+                    # If no quota type detected or retry already attempted, fallback
+                    else:
+                        if retry_attempted:
+                            print(f"[QUOTA] Retry failed for {current_model}. Falling back to next model...")
+                        else:
+                            print(f"[QUOTA] Gemini Quota limit hit for {current_model}. Falling back to next tier...")
+                        last_error = e
+                        break  # Exit retry loop, move to next model
+                
+                # For other errors, maybe try next model if it seems transient, but generally fail
+                # If it's a model not found error (404), definitely try next
+                if "404" in error_str or "NOT_FOUND" in error_str:
+                    print(f"[ERROR] Gemini Model {current_model} not found. Falling back...")
+                    last_error = e
+                    break  # Exit retry loop, move to next model
+                    
+                raise Exception(f"Gemini API error ({current_model}): {str(e)}")
             
     # If we get here, all models failed
     raise Exception(f"All Gemini models exhausted. Final error: {str(last_error)}")

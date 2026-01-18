@@ -53,3 +53,4 @@ frontend/.next/
 out/
 build/
 dist/
+company_levels_cache.json

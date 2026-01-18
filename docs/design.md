@@ -50,15 +50,15 @@
 
 ```mermaid
 flowchart TD
-    A[Offer Collection Node<br/>Regular] --> B[Market Research Node<br/>AsyncBatchNode]
+    A[Offer Collection Node<br/>Regular] --> B[Market Research Node<br/>AsyncParallelBatchNode]
     B --> C[Cost of Living Adjustment Node<br/>BatchNode]
-    C --> D[Market Benchmarking Node<br/>AsyncBatchNode]
+    C --> D[Market Benchmarking Node<br/>AsyncParallelBatchNode]
     D --> E[Preference Scoring Node<br/>BatchNode]
     E --> F[AI Analysis Node<br/>AsyncNode]
     F --> G[Visualization Preparation Node<br/>Regular]
     G --> H[Report Generation Node<br/>Regular]
     
-    subgraph "Async Processing"
+    subgraph "Concurrent Async Processing"
         B -.->|Parallel I/O| B1[Web Research APIs]
         D -.->|Parallel I/O| D1[Market Data APIs]
         F -.->|Async LLM| F1[AI Analysis Calls]
@@ -164,10 +164,10 @@ shared = {
 
 2. **Market Research Node**
    - *Purpose*: Gather real-time market intelligence for each company using AI agents
-   - *Type*: AsyncBatchNode (processes multiple offers with async I/O)
+   - *Type*: AsyncParallelBatchNode (processes multiple offers concurrently with async I/O)
    - *Steps*:
      - *prep_async*: Read offers from shared store, extract company and position details
-     - *exec_async*: Use AI agents to research each company (culture, recent news, employee satisfaction) - async I/O calls
+     - *exec_async*: Use AI agents to research each company (culture, recent news, employee satisfaction) - parallel async I/O calls with asyncio.gather
      - *post_async*: Enrich offer data with market research insights
 
 3. **Cost of Living Adjustment Node**
@@ -180,10 +180,10 @@ shared = {
 
 4. **Market Benchmarking Node**
    - *Purpose*: Compare each offer against industry market data
-   - *Type*: AsyncBatchNode (async API calls for market data)
+   - *Type*: AsyncParallelBatchNode (concurrent async API calls for market data)
    - *Steps*:
      - *prep_async*: Read offers and extract position/location/experience data
-     - *exec_async*: Fetch market data and calculate percentiles for each offer - async I/O calls
+     - *exec_async*: Fetch market data and calculate percentiles for each offer - parallel async I/O calls with asyncio.gather
      - *post_async*: Add market_percentile and competitive_analysis to each offer
 
 5. **Preference Scoring Node**
@@ -300,24 +300,28 @@ class PreferenceScoringNode(BatchNode):
             shared["offers"][i]["score_data"] = score
 ```
 
-**AsyncBatchNode Pattern (for I/O-bound batch operations):**
+**AsyncParallelBatchNode Pattern (for concurrent I/O-bound batch operations):**
 ```python
-class MarketResearchNode(AsyncBatchNode):
+class MarketResearchNode(AsyncParallelBatchNode):
     async def prep_async(self, shared):
         # Return iterable of research items
         return [{"company": offer["company"], "offer_id": offer["id"]} 
                 for offer in shared["offers"]]
     
     async def exec_async(self, research_item):
-        # Process single research item with async I/O
+        # Process single research item with parallel async I/O calls
         # Never access shared store here
         # Never use try/except here
-        research = await research_company_async(research_item["company"])
-        return {"offer_id": research_item["offer_id"], "research": research}
+        # Use asyncio.gather for parallel operations within each item
+        company_research, market_sentiment = await asyncio.gather(
+            research_company_async(research_item["company"]),
+            get_market_sentiment_async(research_item["company"])
+        )
+        return {"offer_id": research_item["offer_id"], "research": company_research, "sentiment": market_sentiment}
     
     async def post_async(self, shared, prep_res, exec_res_list):
         # Update offers with research data
-        research_lookup = {r["offer_id"]: r["research"] for r in exec_res_list}
+        research_lookup = {r["offer_id"]: r for r in exec_res_list}
         for offer in shared["offers"]:
             if offer["id"] in research_lookup:
                 offer["research"] = research_lookup[offer["id"]]

@@ -3,7 +3,7 @@ OfferCompare Pro - Node Implementations
 Complete set of nodes for intelligent job offer analysis and comparison
 """
 
-from pocketflow import Node, BatchNode, AsyncNode, AsyncBatchNode
+from pocketflow import Node, BatchNode, AsyncNode, AsyncBatchNode, AsyncParallelBatchNode
 from utils.call_llm import call_llm, call_llm_structured, call_llm_async, call_llm_structured_async
 from utils.web_research import research_company, get_market_sentiment, research_company_async, get_market_sentiment_async
 from utils.col_calculator import estimate_annual_expenses, get_location_insights
@@ -16,6 +16,7 @@ from utils.viz_formatter import create_visualization_package
 from utils.company_db import get_company_data, enrich_company_data
 import json
 import asyncio
+import time
 
 class OfferCollectionNode(Node):
     """
@@ -142,10 +143,10 @@ class OfferCollectionNode(Node):
         except ValueError:
             return default if default is not None else 0
 
-class MarketResearchNode(AsyncBatchNode):
+class MarketResearchNode(AsyncParallelBatchNode):
     """
     Gather comprehensive market intelligence for each company using AI agents.
-    Uses AsyncBatchNode for efficient parallel I/O operations.
+    Uses AsyncParallelBatchNode for concurrent parallel I/O operations across all companies.
     """
     
     async def prep_async(self, shared):
@@ -168,12 +169,17 @@ class MarketResearchNode(AsyncBatchNode):
         Conduct AI-powered research for a single company.
         Uses async I/O for parallel processing.
         """
-        print(f"\nConducting market research for {research_item['company']}...")
+        start_time = time.time()
+        timestamp = time.strftime("%H:%M:%S.%f", time.localtime(start_time))[:-3]
+        print(f"\n[DEBUG] MarketResearch for {research_item['company']} started at {timestamp}")
+        print(f"Conducting market research for {research_item['company']}...")
         
         try:
-            # Parallel async calls for research data
-            company_research = await research_company_async(research_item["company"], research_item["position"])
-            market_sentiment = await get_market_sentiment_async(research_item["company"], research_item["position"])
+            # Parallel async calls for research data - run concurrently
+            company_research, market_sentiment = await asyncio.gather(
+                research_company_async(research_item["company"], research_item["position"]),
+                get_market_sentiment_async(research_item["company"], research_item["position"]),
+            )
             
             # These are local operations, so keep sync for now
             company_db_data = get_company_data(research_item["company"])
@@ -181,6 +187,11 @@ class MarketResearchNode(AsyncBatchNode):
                 "position_context": research_item["position"],
                 "location": research_item["location"]
             })
+            
+            end_time = time.time()
+            duration = end_time - start_time
+            end_timestamp = time.strftime("%H:%M:%S.%f", time.localtime(end_time))[:-3]
+            print(f"[DEBUG] MarketResearch for {research_item['company']} completed at {end_timestamp}, duration: {duration:.2f}s")
             
             return {
                 "offer_id": research_item["offer_id"],
@@ -356,10 +367,10 @@ class COLAnalysisNode(BatchNode):
         print("COL and Net Savings analysis completed")
         return "default"
 
-class MarketBenchmarkingNode(AsyncBatchNode):
+class MarketBenchmarkingNode(AsyncParallelBatchNode):
     """
     Compare each offer against industry market standards.
-    Uses AsyncBatchNode for parallel market data API calls.
+    Uses AsyncParallelBatchNode for concurrent parallel market data API calls.
     """
     
     async def prep_async(self, shared):
@@ -385,7 +396,10 @@ class MarketBenchmarkingNode(AsyncBatchNode):
     
     async def exec_async(self, benchmark_item):
         """Perform market benchmarking for a single offer using async calls."""
-        print(f"\nPerforming market benchmarking analysis for {benchmark_item['company']} {benchmark_item['position']}...")
+        start_time = time.time()
+        timestamp = time.strftime("%H:%M:%S.%f", time.localtime(start_time))[:-3]
+        print(f"\n[DEBUG] MarketBenchmarking for {benchmark_item['company']} started at {timestamp}")
+        print(f"Performing market benchmarking analysis for {benchmark_item['company']} {benchmark_item['position']}...")
         
         try:
             # 1. Determine seniority level for benchmarking
@@ -398,44 +412,48 @@ class MarketBenchmarkingNode(AsyncBatchNode):
             level_desc = get_level_description(universal_level)
             print(f"  -> Identified seniority level: {level_desc}")
 
-            # 2. Parallel async calls for market data
+            # 2. Parallel async calls for market data - run concurrently
             # Passing universal_level to refine the search
-            compensation_insights = await get_compensation_insights_async(
-                benchmark_item["position"],
-                benchmark_item["base_salary"],
-                benchmark_item["equity"],
-                benchmark_item["bonus"],
-                benchmark_item["location"],
-                universal_level=universal_level
+            compensation_insights, base_percentile, total_percentile, ai_analysis = await asyncio.gather(
+                get_compensation_insights_async(
+                    benchmark_item["position"],
+                    benchmark_item["base_salary"],
+                    benchmark_item["equity"],
+                    benchmark_item["bonus"],
+                    benchmark_item["location"],
+                    universal_level=universal_level
+                ),
+                calculate_market_percentile_async(
+                    benchmark_item["base_salary"],
+                    benchmark_item["position"],
+                    benchmark_item["location"],
+                    universal_level=universal_level
+                ),
+                calculate_market_percentile_async(
+                    benchmark_item["total_compensation"],
+                    benchmark_item["position"],
+                    benchmark_item["location"],
+                    universal_level=universal_level
+                ),
+                ai_market_analysis_async(
+                    benchmark_item["position"],
+                    benchmark_item["company"],
+                    benchmark_item["location"],
+                    {
+                        "base_salary": benchmark_item["base_salary"],
+                        "equity_value": benchmark_item["equity"],
+                        "bonus": benchmark_item["bonus"],
+                        "total_compensation": benchmark_item["total_compensation"],
+                        "company_level": benchmark_item["level"],
+                        "universal_level": universal_level
+                    }
+                )
             )
             
-            base_percentile = await calculate_market_percentile_async(
-                benchmark_item["base_salary"],
-                benchmark_item["position"],
-                benchmark_item["location"],
-                universal_level=universal_level
-            )
-            
-            total_percentile = await calculate_market_percentile_async(
-                benchmark_item["total_compensation"],
-                benchmark_item["position"],
-                benchmark_item["location"],
-                universal_level=universal_level
-            )
-            
-            ai_analysis = await ai_market_analysis_async(
-                benchmark_item["position"],
-                benchmark_item["company"],
-                benchmark_item["location"],
-                {
-                    "base_salary": benchmark_item["base_salary"],
-                    "equity_value": benchmark_item["equity"],
-                    "bonus": benchmark_item["bonus"],
-                    "total_compensation": benchmark_item["total_compensation"],
-                    "company_level": benchmark_item["level"],
-                    "universal_level": universal_level
-                }
-            )
+            end_time = time.time()
+            duration = end_time - start_time
+            end_timestamp = time.strftime("%H:%M:%S.%f", time.localtime(end_time))[:-3]
+            print(f"[DEBUG] MarketBenchmarking for {benchmark_item['company']} completed at {end_timestamp}, duration: {duration:.2f}s")
             
             # Include alias keys expected by tests
             return {
@@ -553,11 +571,15 @@ class AIAnalysisNode(AsyncNode):
     
     async def exec_async(self, prep_data):
         """Generate comprehensive AI analysis using async LLM calls."""
+        start_time = time.time()
+        timestamp = time.strftime("%H:%M:%S.%f", time.localtime(start_time))[:-3]
+        print(f"\n[DEBUG] AIAnalysis started at {timestamp}")
+        
         offers = prep_data["offers"]
         comparison_results = prep_data["comparison_results"]
         user_preferences = prep_data["user_preferences"]
         
-        print(f"\nGenerating AI-powered analysis and recommendations...")
+        print(f"Generating AI-powered analysis and recommendations...")
         
         # Prepare comprehensive data for AI analysis
         analysis_prompt = self._build_analysis_prompt(offers, comparison_results, user_preferences)
@@ -574,14 +596,29 @@ class AIAnalysisNode(AsyncNode):
             print(f"[WARNING] Main AI Analysis failed: {error_str[:100]}...")
             ai_analysis = "Our AI is currently at capacity. Here is a summary of your data: " + comparison_results.get("comparison_summary", "Comparison available in details.")
         
-        # Generate specific recommendations for each offer (async)
-        offer_recommendations = []
-        for offer in offers:
-            recommendation = await self._generate_offer_recommendation_async(offer, user_preferences)
-            offer_recommendations.append({
+        # Generate specific recommendations for each offer (async) - run in parallel
+        rec_start_time = time.time()
+        rec_timestamp = time.strftime("%H:%M:%S.%f", time.localtime(rec_start_time))[:-3]
+        print(f"[DEBUG] Generating {len(offers)} recommendations in parallel, started at {rec_timestamp}")
+        
+        recommendation_tasks = [
+            self._generate_offer_recommendation_async(offer, user_preferences)
+            for offer in offers
+        ]
+        recommendations = await asyncio.gather(*recommendation_tasks)
+        
+        rec_end_time = time.time()
+        rec_duration = rec_end_time - rec_start_time
+        rec_end_timestamp = time.strftime("%H:%M:%S.%f", time.localtime(rec_end_time))[:-3]
+        print(f"[DEBUG] Recommendations generation completed at {rec_end_timestamp}, duration: {rec_duration:.2f}s")
+        
+        offer_recommendations = [
+            {
                 "offer_id": offer["id"],
                 "recommendation": recommendation
-            })
+            }
+            for offer, recommendation in zip(offers, recommendations)
+        ]
         
         # Generate decision framework (async)
         try:
@@ -589,6 +626,11 @@ class AIAnalysisNode(AsyncNode):
         except Exception as e:
             print(f"[WARNING] Decision Framework AI failed: {str(e)[:100]}...")
             decision_framework = "1. Compare Net Pay\n2. Evaluate WLB vs Growth\n3. Consider long-term career trajectory."
+        
+        end_time = time.time()
+        duration = end_time - start_time
+        end_timestamp = time.strftime("%H:%M:%S.%f", time.localtime(end_time))[:-3]
+        print(f"[DEBUG] AIAnalysis completed at {end_timestamp}, total duration: {duration:.2f}s")
         
         return {
             "comprehensive_analysis": ai_analysis,
