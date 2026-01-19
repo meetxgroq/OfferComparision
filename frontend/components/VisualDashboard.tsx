@@ -98,15 +98,45 @@ export default function VisualDashboard({ analysis, offer }: VisualDashboardProp
                                 maintainAspectRatio: false,
                                 scales: {
                                     r: {
-                                        min: 0, max: 10,
-                                        ticks: { display: false },
-                                        grid: { color: 'rgba(255,255,255,0.05)' },
-                                        pointLabels: { color: '#94a3b8', font: { size: 10 } }
+                                        beginAtZero: true,
+                                        min: 0,
+                                        max: 10,
+                                        ticks: {
+                                            display: true,
+                                            stepSize: 2,
+                                            color: '#94a3b8',
+                                            font: { size: 9 },
+                                            backdropColor: 'rgba(15, 23, 42, 0.8)',
+                                            backdropPadding: 2
+                                        },
+                                        grid: {
+                                            color: 'rgba(255,255,255,0.1)',
+                                            lineWidth: 1
+                                        },
+                                        angleLines: {
+                                            color: 'rgba(255,255,255,0.05)'
+                                        },
+                                        pointLabels: {
+                                            color: '#94a3b8',
+                                            font: { size: 10 }
+                                        }
                                     }
                                 },
-                                plugins: { legend: { display: false } }
+                                plugins: {
+                                    legend: { display: false },
+                                    tooltip: {
+                                        callbacks: {
+                                            label: (context) => {
+                                                return `${context.dataset.label}: ${context.parsed.r}/10`
+                                            }
+                                        }
+                                    }
+                                }
                             }}
                         />
+                    </div>
+                    <div className="text-xs text-slate-500 mt-2 text-center">
+                        Scale: 0-10
                     </div>
                 </div>
 

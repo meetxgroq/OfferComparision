@@ -244,21 +244,48 @@ export default function AnalysisResults({ results }: AnalysisResultsProps) {
                     scales: {
                       r: {
                         beginAtZero: true,
+                        min: 0,
                         max: 10,
-                        ticks: { display: false, backdropColor: 'transparent' },
-                        grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                        angleLines: { color: 'rgba(255, 255, 255, 0.1)' },
-                        pointLabels: { color: '#94a3b8', font: { size: 12 } }
+                        ticks: {
+                          display: true,
+                          stepSize: 2,
+                          color: '#94a3b8',
+                          font: { size: 11 },
+                          backdropColor: 'rgba(15, 23, 42, 0.8)',
+                          backdropPadding: 4
+                        },
+                        grid: {
+                          color: 'rgba(255, 255, 255, 0.15)',
+                          lineWidth: 1
+                        },
+                        angleLines: {
+                          color: 'rgba(255, 255, 255, 0.1)',
+                          lineWidth: 1
+                        },
+                        pointLabels: {
+                          color: '#cbd5e1',
+                          font: { size: 12, weight: '500' }
+                        }
                       }
                     },
                     plugins: {
                       legend: {
                         position: 'bottom',
                         labels: { color: '#e2e8f0', padding: 20, usePointStyle: true }
+                      },
+                      tooltip: {
+                        callbacks: {
+                          label: (context) => {
+                            return `${context.dataset.label}: ${context.parsed.r}/10`
+                          }
+                        }
                       }
                     }
                   }}
                 />
+              </div>
+              <div className="text-xs text-slate-500 mt-2 text-center">
+                Scale: 0-10 (higher is better)
               </div>
             </div>
 
