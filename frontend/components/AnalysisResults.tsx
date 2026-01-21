@@ -186,10 +186,13 @@ export default function AnalysisResults({ results }: AnalysisResultsProps) {
                     h3: ({ children }) => <h3 className="text-cyan-400 font-semibold mt-6 mb-3">{children}</h3>,
                     ul: ({ children }) => <ul className="list-disc list-inside space-y-2 mb-4">{children}</ul>,
                     li: ({ children }) => <li className="marker:text-slate-500">{children}</li>,
-                    strong: ({ children }) => <span className="text-white font-semibold">{children}</span>
+                    strong: ({ children }) => <span className="text-white font-semibold">{children}</span>,
+                    p: ({ children }) => <p className="mb-4">{children}</p>
                   }}
                 >
-                  {results.final_report?.detailed_analysis}
+                  {typeof results.final_report?.detailed_analysis === 'string' 
+                    ? results.final_report.detailed_analysis 
+                    : String(results.final_report?.detailed_analysis || '')}
                 </ReactMarkdown>
               </div>
             </div>
@@ -203,10 +206,21 @@ export default function AnalysisResults({ results }: AnalysisResultsProps) {
                     h3: ({ children }) => <h3 className="text-emerald-400 font-semibold mt-6 mb-3">{children}</h3>,
                     ul: ({ children }) => <ul className="list-disc list-inside space-y-2 mb-4">{children}</ul>,
                     li: ({ children }) => <li className="marker:text-slate-500">{children}</li>,
-                    strong: ({ children }) => <span className="text-white font-semibold">{children}</span>
+                    strong: ({ children }) => <span className="text-white font-semibold">{children}</span>,
+                    p: ({ children }) => <p className="mb-4">{children}</p>
                   }}
                 >
-                  {results.final_report?.decision_framework}
+                  {(() => {
+                    const framework = results.final_report?.decision_framework;
+                    if (typeof framework === 'string') {
+                      // Convert comma-separated list to markdown list if needed
+                      if (framework.includes(',') && !framework.includes('\n') && !framework.includes('-')) {
+                        return framework.split(',').map(item => item.trim()).filter(Boolean).map(item => `- ${item}`).join('\n');
+                      }
+                      return framework;
+                    }
+                    return String(framework || '');
+                  })()}
                 </ReactMarkdown>
               </div>
             </div>

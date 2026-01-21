@@ -13,7 +13,11 @@ from nodes import (
     PreferenceScoringNode,
     AIAnalysisNode,
     VisualizationPreparationNode,
-    ReportGenerationNode
+    ReportGenerationNode,
+    QuickFinancialAnalysisNode,
+    QuickMarketAnalysisNode,
+    QuickAIAnalysisNode,
+    QuickVisualizationNode
 )
 
 def create_offer_comparison_flow():
@@ -74,6 +78,42 @@ def create_demo_flow():
     
     # For demo purposes, we'll use the same flow but with sample data
     return create_offer_comparison_flow()
+
+def create_quick_analysis_flow():
+    """
+    Create streamlined quick analysis flow for fast results.
+    
+    Uses combined nodes and cached data to provide essential insights in <1 minute.
+    
+    Flow Sequence:
+    1. QuickFinancialAnalysis → Tax + COL in one pass (BatchNode)
+    2. QuickMarketAnalysis → Cached company data + quick market lookups (AsyncParallelBatchNode)
+    3. QuickAIAnalysis → Single comprehensive LLM call for scoring + recommendations (AsyncNode)
+    4. QuickVisualization → Essential charts + concise report (Node)
+    
+    Note: This flow expects offers and user_preferences to already be in the shared store.
+    The API server handles offer collection before running this flow.
+    
+    Returns:
+        AsyncFlow: Quick analysis workflow optimized for speed
+    """
+    
+    print("Initializing OfferCompare Pro Quick Analysis Flow...")
+    
+    # Create quick analysis nodes
+    quick_financial = QuickFinancialAnalysisNode()
+    quick_market = QuickMarketAnalysisNode()
+    quick_ai = QuickAIAnalysisNode()
+    quick_viz = QuickVisualizationNode()
+    
+    # Connect nodes in sequence
+    quick_financial >> quick_market >> quick_ai >> quick_viz
+    
+    # Create AsyncFlow
+    flow = AsyncFlow(start=quick_financial)
+    
+    print("OfferCompare Pro Quick Analysis Flow initialized successfully!")
+    return flow
 
 def get_sample_offers():
     """

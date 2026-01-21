@@ -12,7 +12,8 @@ import {
   CloudArrowUpIcon,
   XMarkIcon,
   AdjustmentsHorizontalIcon,
-  ArrowRightIcon
+  ArrowRightIcon,
+  ClockIcon
 } from '@heroicons/react/24/outline'
 
 import ProfileManager from '@/components/ProfileManager'
@@ -36,6 +37,7 @@ export default function OfferComparePage() {
   const [error, setError] = useState<string | null>(null)
   const [analysisResults, setAnalysisResults] = useState(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [useQuickAnalysis, setUseQuickAnalysis] = useState(false)
   const [showProfileModal, setShowProfileModal] = useState(false)
   const [showPreferencesModal, setShowPreferencesModal] = useState(false)
   const [showOfferModal, setShowOfferModal] = useState(false)
@@ -147,7 +149,8 @@ export default function OfferComparePage() {
 
     try {
       const selectedOfferData = offers.filter(offer => selectedOffers.includes(offer.id))
-      const response = await axios.post('http://localhost:8001/api/analyze', {
+      const endpoint = useQuickAnalysis ? '/api/analyze/quick' : '/api/analyze'
+      const response = await axios.post(`http://localhost:8001${endpoint}`, {
         offers: selectedOfferData,
         user_preferences: preferences
       })
@@ -351,25 +354,44 @@ export default function OfferComparePage() {
                 </div>
 
                 <div className="flex flex-col items-end gap-2">
+                  {/* Quick Analysis Toggle */}
+                  <div className="flex items-center gap-3 mb-2">
+                    <label className="flex items-center gap-2 text-sm text-slate-400 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={useQuickAnalysis}
+                        onChange={(e) => setUseQuickAnalysis(e.target.checked)}
+                        className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-cyan-600 focus:ring-cyan-500 focus:ring-offset-slate-900"
+                      />
+                      <span className="flex items-center gap-1">
+                        <ClockIcon className="h-4 w-4" />
+                        Quick Analysis
+                        <span className="text-xs text-slate-500">(&lt;1 min)</span>
+                      </span>
+                    </label>
+                  </div>
+                  
                   <button
                     onClick={runAnalysis}
                     disabled={selectedOffers.length < 2 || isAnalyzing}
                     className={`
                       px-8 py-4 rounded-xl font-bold text-lg flex items-center gap-3 transition-all min-w-[200px] justify-center
                       ${selectedOffers.length >= 2
-                        ? 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white shadow-xl shadow-blue-900/30'
+                        ? useQuickAnalysis
+                          ? 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white shadow-xl shadow-green-900/30'
+                          : 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white shadow-xl shadow-blue-900/30'
                         : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'}
                     `}
                   >
                     {isAnalyzing ? (
                       <>
                         <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        <span>Analyzing...</span>
+                        <span>{useQuickAnalysis ? 'Quick Analyzing...' : 'Analyzing...'}</span>
                       </>
                     ) : (
                       <>
                         <SparklesIcon className="h-6 w-6" />
-                        <span>Run Comparison</span>
+                        <span>{useQuickAnalysis ? 'Quick Comparison' : 'Run Comparison'}</span>
                       </>
                     )}
                   </button>

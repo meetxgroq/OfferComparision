@@ -17,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 
-from flow import get_sample_offers
+from flow import get_sample_offers, create_quick_analysis_flow
 from nodes import (
     MarketResearchNode,
     TaxCalculationNode,
@@ -170,6 +170,50 @@ async def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
 
     try:
         result = await _run_analysis(shared)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return AnalyzeResponse(
+        executive_summary=result.get("executive_summary", ""),
+        final_report=result.get("final_report", {}),
+        comparison_results=result.get("comparison_results", {}),
+        visualization_data=result.get("visualization_data", {}),
+        offers=result.get("offers", []),
+    )
+
+
+async def _run_quick_analysis(shared: Dict[str, Any]) -> Dict[str, Any]:
+    """Run quick analysis flow."""
+    flow = create_quick_analysis_flow()
+    await flow.run_async(shared)
+    return shared
+
+
+@app.post("/api/analyze/quick", response_model=AnalyzeResponse)
+async def analyze_quick(req: AnalyzeRequest) -> AnalyzeResponse:
+    """
+    Quick analysis endpoint - faster results with essential insights.
+    Uses combined nodes and cached data for <1 minute analysis.
+    """
+    if not req.offers:
+        raise HTTPException(status_code=400, detail="Offers list cannot be empty")
+
+    # Prepare shared store
+    offers = []
+    for i, o in enumerate(req.offers, start=1):
+        data = o.model_dump()
+        data["id"] = data.get("id") or f"offer_{i}"
+        if data.get("total_compensation") is None:
+            data["total_compensation"] = data.get("base_salary", 0) + data.get("equity", 0) + data.get("bonus", 0)
+        offers.append(data)
+
+    shared = {
+        "offers": offers,
+        "user_preferences": req.user_preferences or {},
+    }
+
+    try:
+        result = await _run_quick_analysis(shared)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

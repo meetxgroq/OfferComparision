@@ -1010,3 +1010,570 @@ NEXT STEPS:
         ]
         
         return action_items
+
+
+class QuickVisualizationNode(Node):
+    """
+    Quick Visualization - Generates essential charts and concise report.
+    Combines visualization prep and report generation for fast results.
+    """
+    
+    def prep(self, shared):
+        """Gather all analysis results for quick visualization and report."""
+        return {
+            "offers": shared.get("offers", []),
+            "comparison_results": shared.get("comparison_results", {}),
+            "ai_analysis": shared.get("ai_analysis", ""),
+            "decision_framework": shared.get("decision_framework", ""),
+            "scoring_weights": shared.get("scoring_weights", {}),
+            "user_preferences": shared.get("user_preferences", {})
+        }
+    
+    def exec(self, prep_data):
+        """Generate essential visualizations and concise report."""
+        print(f"\nPreparing quick visualizations and report...")
+        
+        comparison_results = prep_data["comparison_results"]
+        ranked_offers = comparison_results.get("ranked_offers", [])
+        scoring_weights = prep_data["scoring_weights"]
+        
+        # Generate essential visualization package (radar and bar charts only)
+        viz_package = create_visualization_package(ranked_offers, scoring_weights)
+        
+        # Keep only essential charts
+        essential_viz = {
+            "radar_chart": viz_package.get("radar_chart"),
+            "bar_chart": viz_package.get("bar_chart"),
+            "summary_stats": viz_package.get("summary_stats", {})
+        }
+        
+        # Generate concise executive summary
+        top_offer = comparison_results.get("top_offer", {})
+        executive_summary = self._generate_quick_summary(prep_data, top_offer)
+        
+        # Generate minimal structured report
+        final_report = {
+            "report_type": "OfferCompare Pro Quick Analysis",
+            "analysis_date": "2024-01-01",
+            "offers_analyzed": len(prep_data["offers"]),
+            "top_recommendation": top_offer.get("company", "N/A"),
+            "detailed_analysis": prep_data["ai_analysis"],
+            "decision_framework": prep_data["decision_framework"],
+            "offer_rankings": [
+                {
+                    "offer_id": r.get("offer_id"),
+                    "company": r.get("company"),
+                    "total_score": r.get("total_score"),
+                    "rank": r.get("rank")
+                }
+                for r in ranked_offers
+            ]
+        }
+        
+        return {
+            "visualization_data": essential_viz,
+            "executive_summary": executive_summary,
+            "final_report": final_report,
+            "action_items": [
+                "Review the AI analysis above",
+                "Consider the decision framework",
+                "Use full analysis for detailed insights"
+            ],
+            "chart_count": 2,
+            "charts_ready": True
+        }
+    
+    def post(self, shared, prep_res, exec_res):
+        """Store quick visualization and report data."""
+        shared["visualization_data"] = exec_res["visualization_data"]
+        shared["executive_summary"] = exec_res["executive_summary"]
+        shared["final_report"] = exec_res["final_report"]
+        shared["action_items"] = exec_res["action_items"]
+        
+        print(f"Prepared {exec_res['chart_count']} essential visualizations")
+        print("\n" + "="*80)
+        print("OFFERCOMPARE PRO - QUICK ANALYSIS SUMMARY")
+        print("="*80)
+        print(exec_res["executive_summary"])
+        print("\n" + "="*80)
+        print("Quick analysis completed!")
+        return "default"
+    
+    def _generate_quick_summary(self, data, top_offer):
+        """Generate concise executive summary."""
+        comparison_results = data["comparison_results"]
+        ranked_offers = comparison_results.get("ranked_offers", [])
+        
+        if not top_offer:
+            return "No offers available for comparison."
+        
+        # Calculate score stats directly from ranked_offers
+        scores = [offer.get("total_score", 0) for offer in ranked_offers if offer.get("total_score") is not None]
+        min_score = min(scores) if scores else 0
+        max_score = max(scores) if scores else 0
+        avg_score = sum(scores) / len(scores) if scores else 0
+        
+        summary = f"""
+TOP RECOMMENDATION: {top_offer.get('company', 'N/A')} - {top_offer.get('position', 'N/A')}
+Overall Score: {top_offer.get('total_score', 0):.1f}/100
+
+COMPARISON SUMMARY:
+{comparison_results.get('comparison_summary', 'Analysis completed')}
+
+KEY INSIGHTS:
+• Total offers analyzed: {len(data['offers'])}
+• Score range: {min_score:.1f} - {max_score:.1f}
+• Average score: {avg_score:.1f}
+
+NEXT STEPS:
+1. Review AI analysis above
+2. Consider decision framework
+3. Run full analysis for detailed insights
+"""
+        return summary.strip()
+
+
+# ============================================================================
+# QUICK ANALYSIS NODES - Streamlined workflow for fast results
+# ============================================================================
+
+class QuickFinancialAnalysisNode(BatchNode):
+    """
+    Quick Financial Analysis - Combines Tax Calculation and COL Analysis.
+    Processes all offers in one pass for faster results.
+    """
+    
+    def prep(self, shared):
+        """Extract offers and user base location."""
+        offers = shared.get("offers", [])
+        user_base_location = shared.get("user_preferences", {}).get("base_location", "San Francisco, CA")
+        
+        items = []
+        for offer in offers:
+            items.append({
+                "offer": offer,
+                "base_location": user_base_location
+            })
+        return items
+    
+    def exec(self, item):
+        """Calculate tax, net pay, COL, and net savings for a single offer."""
+        offer = item["offer"]
+        base_location = item["base_location"]
+        
+        # Determine tax location (handle Remote)
+        tax_location = offer["location"]
+        if "remote" in tax_location.lower():
+            tax_location = base_location
+        
+        # Calculate net pay (tax calculation)
+        net_pay_analysis = calculate_net_pay(
+            offer["total_compensation"],
+            tax_location
+        )
+        
+        # Calculate COL and expenses
+        expense_analysis = estimate_annual_expenses(offer["location"])
+        annual_expenses = expense_analysis["estimated_annual_expenses"]
+        
+        # Calculate net savings
+        net_pay = net_pay_analysis["estimated_net_pay"]
+        net_savings = net_pay - annual_expenses
+        
+        return {
+            "offer_id": offer["id"],
+            "net_pay_analysis": net_pay_analysis,
+            "expense_analysis": expense_analysis,
+            "net_savings": net_savings
+        }
+    
+    def post(self, shared, prep_res, exec_res_list):
+        """Update offers with financial analysis."""
+        results_lookup = {r["offer_id"]: r for r in exec_res_list}
+        
+        for offer in shared["offers"]:
+            if offer["id"] in results_lookup:
+                res = results_lookup[offer["id"]]
+                offer["net_pay_analysis"] = res["net_pay_analysis"]
+                offer["estimated_net_pay"] = res["net_pay_analysis"]["estimated_net_pay"]
+                offer["expense_analysis"] = res["expense_analysis"]
+                offer["estimated_annual_expenses"] = res["expense_analysis"]["estimated_annual_expenses"]
+                offer["net_savings"] = res["net_savings"]
+        
+        print(f"Quick financial analysis completed for {len(exec_res_list)} offers")
+        return "default"
+
+
+class QuickMarketAnalysisNode(AsyncParallelBatchNode):
+    """
+    Quick Market Analysis - Uses cached company data and quick market lookups.
+    Skips deep web research for faster results.
+    """
+    
+    async def prep_async(self, shared):
+        """Extract offer data for quick market analysis."""
+        offers = shared.get("offers", [])
+        market_items = []
+        
+        for offer in offers:
+            market_items.append({
+                "offer_id": offer["id"],
+                "company": offer["company"],
+                "position": offer["position"],
+                "level": offer.get("level"),
+                "location": offer["location"],
+                "base_salary": offer["base_salary"],
+                "total_compensation": offer["total_compensation"],
+                "equity": offer.get("equity", 0),
+                "bonus": offer.get("bonus", 0),
+                "years_experience": offer.get("years_experience", 5)
+            })
+        
+        return market_items
+    
+    async def exec_async(self, market_item):
+        """Quick market analysis using cached data and fast lookups."""
+        start_time = time.time()
+        timestamp = time.strftime("%H:%M:%S.%f", time.localtime(start_time))[:-3]
+        print(f"\n[DEBUG] QuickMarketAnalysis for {market_item['company']} started at {timestamp}")
+        
+        # Use cached company data (fast, no API calls)
+        company_db_data = get_company_data(market_item["company"])
+        
+        # Infer experience level from position/years (no LLM call)
+        from utils.market_data import infer_experience_level
+        experience_level = infer_experience_level(
+            market_item["position"],
+            market_item["years_experience"]
+        )
+        
+        # Quick market percentile calculations (synchronous, no API)
+        from utils.market_data import calculate_market_percentile, get_market_salary_range
+        
+        # Run percentile calculations in parallel using asyncio
+        base_percentile_task = asyncio.to_thread(
+            calculate_market_percentile,
+            market_item["base_salary"],
+            market_item["position"],
+            market_item["location"],
+            experience_level=experience_level
+        )
+        total_percentile_task = asyncio.to_thread(
+            calculate_market_percentile,
+            market_item["total_compensation"],
+            market_item["position"],
+            market_item["location"],
+            experience_level=experience_level
+        )
+        market_range_task = asyncio.to_thread(
+            get_market_salary_range,
+            market_item["position"],
+            market_item["location"],
+            experience_level=experience_level
+        )
+        
+        base_percentile, total_percentile, market_range = await asyncio.gather(
+            base_percentile_task,
+            total_percentile_task,
+            market_range_task
+        )
+        
+        # Create quick compensation insights from market data
+        compensation_insights = {
+            "market_range": market_range["adjusted_range"],
+            "base_percentile": base_percentile["market_percentile"],
+            "total_percentile": total_percentile["market_percentile"],
+            "competitiveness": base_percentile.get("competitiveness", "Average")
+        }
+        
+        end_time = time.time()
+        duration = end_time - start_time
+        end_timestamp = time.strftime("%H:%M:%S.%f", time.localtime(end_time))[:-3]
+        print(f"[DEBUG] QuickMarketAnalysis for {market_item['company']} completed at {end_timestamp}, duration: {duration:.2f}s")
+        
+        return {
+            "offer_id": market_item["offer_id"],
+            "company_db_data": company_db_data or {},
+            "compensation_insights": compensation_insights,
+            "market_insights": compensation_insights,
+            "base_percentile": base_percentile,
+            "market_analysis": base_percentile,
+            "total_percentile": total_percentile,
+            "total_comp_analysis": total_percentile,
+            "experience_level": experience_level
+        }
+    
+    async def post_async(self, shared, prep_res, exec_res_list):
+        """Add quick market analysis data to offers."""
+        market_lookup = {r.get("offer_id"): r for r in exec_res_list if isinstance(r, dict)}
+        
+        for offer in shared["offers"]:
+            if offer["id"] in market_lookup:
+                market_data = market_lookup[offer["id"]]
+                # Add company data
+                if market_data.get("company_db_data"):
+                    offer["company_db_data"] = market_data["company_db_data"]
+                    # Extract metrics for compatibility
+                    culture_metrics = market_data["company_db_data"].get("culture_metrics", {})
+                    if culture_metrics:
+                        offer["wlb_score"] = culture_metrics.get("work_life_balance", 7.0)
+                        offer["growth_score"] = culture_metrics.get("career_growth", 7.5)
+                        offer["benefits_grade"] = "A" if market_data["company_db_data"].get("glassdoor_rating", 0) >= 4.0 else "B"
+                
+                # Add market data
+                offer["market_analysis"] = market_data["base_percentile"]
+                offer["total_comp_analysis"] = market_data["total_percentile"]
+                offer["compensation_insights"] = market_data["compensation_insights"]
+        
+        print(f"Quick market analysis completed for {len(exec_res_list)} offers")
+        return "default"
+
+
+class QuickAIAnalysisNode(AsyncNode):
+    """
+    Quick AI Analysis - Combines scoring and AI recommendations in single comprehensive LLM call.
+    Uses structured output for efficiency.
+    """
+    
+    async def prep_async(self, shared):
+        """Prepare all offer data for quick AI analysis."""
+        offers = shared.get("offers", [])
+        user_preferences = shared.get("user_preferences", {})
+        
+        # Calculate weights for scoring
+        weights = customize_weights(user_preferences)
+        
+        return {
+            "offers": offers,
+            "user_preferences": user_preferences,
+            "scoring_weights": weights
+        }
+    
+    async def exec_async(self, prep_data):
+        """Generate comprehensive analysis with single LLM call."""
+        start_time = time.time()
+        timestamp = time.strftime("%H:%M:%S.%f", time.localtime(start_time))[:-3]
+        print(f"\n[DEBUG] QuickAIAnalysis started at {timestamp}")
+        print("Generating quick AI-powered analysis and recommendations...")
+        
+        offers = prep_data["offers"]
+        user_preferences = prep_data["user_preferences"]
+        weights = prep_data["scoring_weights"]
+        
+        # CRITICAL: Always calculate scores first using existing scoring logic
+        # This ensures comparison_results has proper structure with scores
+        for offer in offers:
+            if not offer.get("score_data"):
+                score_data = calculate_offer_score(offer, user_preferences, weights)
+                offer["score_data"] = score_data
+        
+        # Generate proper comparison_results with scores using compare_offers
+        comparison_results = compare_offers(offers, user_preferences, weights)
+        
+        # Build comprehensive prompt with all offer data
+        prompt = self._build_quick_analysis_prompt(offers, user_preferences, weights)
+        
+        # Single structured LLM call for AI insights (not for scores - scores are already calculated)
+        try:
+            structured_response = await call_llm_structured_async(
+                prompt=prompt,
+                response_format={"type": "json_object"},
+                temperature=0.3,
+                system_prompt="You are an expert career advisor. Provide comprehensive job offer analysis with rankings and recommendations in JSON format.",
+                provider=None
+            )
+            
+            # Parse JSON response
+            if isinstance(structured_response, str):
+                analysis_data = json.loads(structured_response)
+            else:
+                analysis_data = structured_response
+            
+            # Extract AI insights from LLM response
+            ai_analysis = analysis_data.get("comprehensive_analysis", comparison_results.get("comparison_summary", "Quick analysis completed."))
+            decision_framework = analysis_data.get("decision_framework", "1. Compare Net Pay\n2. Evaluate WLB vs Growth\n3. Consider long-term career trajectory.")
+            
+            # Extract per-offer recommendations from LLM
+            offer_recommendations = []
+            llm_ranked_offers = analysis_data.get("ranked_offers", [])
+            
+            for offer in offers:
+                offer_id = offer["id"]
+                # Find recommendation for this offer from LLM response
+                recommendation = None
+                for ranked in llm_ranked_offers:
+                    if ranked.get("offer_id") == offer_id or ranked.get("company") == offer.get("company"):
+                        recommendation = ranked.get("recommendation", {})
+                        break
+                
+                if not recommendation:
+                    # Fallback: create basic recommendation based on actual score
+                    score_data = offer.get("score_data", {})
+                    total_score = score_data.get("total_score", 70)
+                    recommendation = {
+                        "verdict": {
+                            "badge": "Analysis Complete",
+                            "color": "blue",
+                            "one_line_summary": f"Score: {total_score:.1f}/100"
+                        },
+                        "scores": {
+                            "compensation": min(10, total_score / 10),
+                            "work_life_balance": min(10, (offer.get("wlb_score", 7) or 7)),
+                            "growth_potential": min(10, (offer.get("growth_score", 7) or 7)),
+                            "job_stability": 7.0,
+                            "culture_fit": 7.0
+                        },
+                        "key_insights": {
+                            "pros": ["Competitive compensation", "Good growth potential"],
+                            "cons": ["Review full analysis for details"]
+                        }
+                    }
+                
+                offer_recommendations.append({
+                    "offer_id": offer_id,
+                    "recommendation": recommendation
+                })
+            
+            end_time = time.time()
+            duration = end_time - start_time
+            end_timestamp = time.strftime("%H:%M:%S.%f", time.localtime(end_time))[:-3]
+            print(f"[DEBUG] QuickAIAnalysis completed at {end_timestamp}, duration: {duration:.2f}s")
+            
+            return {
+                "comprehensive_analysis": ai_analysis,
+                "offer_recommendations": offer_recommendations,
+                "comparison_results": comparison_results,  # Use properly scored comparison_results
+                "decision_framework": decision_framework,
+                # Aliases for compatibility
+                "ai_analysis": ai_analysis
+            }
+            
+        except Exception as e:
+            error_str = str(e)
+            print(f"[WARNING] Quick AI Analysis LLM call failed: {error_str[:100]}...")
+            print("[INFO] Using calculated scores and basic recommendations")
+            
+            # Create basic recommendations based on calculated scores
+            offer_recommendations = []
+            for offer in offers:
+                score_data = offer.get("score_data", {})
+                total_score = score_data.get("total_score", 70)
+                offer_recommendations.append({
+                    "offer_id": offer["id"],
+                    "recommendation": {
+                        "verdict": {
+                            "badge": "Analysis Complete",
+                            "color": "blue",
+                            "one_line_summary": f"Score: {total_score:.1f}/100"
+                        },
+                        "scores": {
+                            "compensation": min(10, total_score / 10),
+                            "work_life_balance": min(10, (offer.get("wlb_score", 7) or 7)),
+                            "growth_potential": min(10, (offer.get("growth_score", 7) or 7)),
+                            "job_stability": 7.0,
+                            "culture_fit": 7.0
+                        },
+                        "key_insights": {
+                            "pros": ["Analysis completed"],
+                            "cons": ["Full analysis recommended for detailed insights"]
+                        }
+                    }
+                })
+            
+            return {
+                "comprehensive_analysis": comparison_results.get("comparison_summary", "Quick analysis completed."),
+                "offer_recommendations": offer_recommendations,
+                "comparison_results": comparison_results,  # Use properly scored comparison_results
+                "decision_framework": "1. Compare Net Pay\n2. Evaluate WLB vs Growth\n3. Consider long-term career trajectory.",
+                "ai_analysis": comparison_results.get("comparison_summary", "")
+            }
+    
+    async def post_async(self, shared, prep_res, exec_res):
+        """Store quick AI analysis results."""
+        # Add recommendations to individual offers
+        rec_lookup = {r["offer_id"]: r["recommendation"] for r in exec_res["offer_recommendations"]}
+        
+        # Create offer lookup for easy access
+        offer_lookup = {offer["id"]: offer for offer in shared["offers"]}
+        
+        for offer in shared["offers"]:
+            if offer["id"] in rec_lookup:
+                offer["ai_recommendation"] = rec_lookup[offer["id"]]
+        
+        # Update ranked_offers with recommendations and ensure offer_data is populated
+        comparison_results = exec_res["comparison_results"]
+        if "ranked_offers" in comparison_results:
+            for ranked_offer in comparison_results["ranked_offers"]:
+                offer_id = ranked_offer.get("offer_id") or ranked_offer.get("id")
+                
+                # Ensure offer_data is populated with full offer details
+                if "offer_data" not in ranked_offer or not ranked_offer["offer_data"]:
+                    if offer_id in offer_lookup:
+                        ranked_offer["offer_data"] = offer_lookup[offer_id]
+                
+                # Add AI recommendation
+                if offer_id in rec_lookup:
+                    ranked_offer["ai_recommendation"] = rec_lookup[offer_id]
+        
+        # Store comprehensive analysis
+        shared["ai_analysis"] = exec_res["comprehensive_analysis"]
+        shared["comparison_results"] = comparison_results
+        shared["decision_framework"] = exec_res["decision_framework"]
+        shared["scoring_weights"] = prep_res["scoring_weights"]
+        
+        print("Quick AI analysis completed")
+        return "default"
+    
+    def _build_quick_analysis_prompt(self, offers, user_preferences, weights):
+        """Build concise prompt for quick analysis."""
+        prompt = f"""
+Analyze these {len(offers)} job offers and provide a comprehensive JSON response with scoring, rankings, and recommendations.
+
+USER PRIORITIES: {user_preferences}
+
+OFFERS DATA:
+"""
+        for offer in offers:
+            net_pay = offer.get('estimated_net_pay', 0)
+            net_pay_str = f"${net_pay:,}" if net_pay > 0 else "N/A"
+            market_pct = offer.get('market_analysis', {}).get('market_percentile', 'N/A')
+            
+            prompt += f"""
+{offer.get('company', 'Unknown')} - {offer.get('position', 'Unknown')} ({offer.get('location', 'Unknown')})
+- Base Salary: ${offer.get('base_salary', 0):,}
+- Total Comp: ${offer.get('total_compensation', 0):,}
+- Estimated Net Pay: {net_pay_str}
+- Net Savings: ${offer.get('net_savings', 0):,}
+- Market Percentile: {market_pct}
+- WLB Score: {offer.get('wlb_score', 'N/A')}
+- Growth Score: {offer.get('growth_score', 'N/A')}
+"""
+        
+        prompt += f"""
+
+Provide a JSON response with this structure:
+{{
+    "ranked_offers": [
+        {{
+            "offer_id": "offer_1",
+            "company": "Company Name",
+            "position": "Position",
+            "total_score": 85.5,
+            "rank": 1,
+            "recommendation": {{
+                "verdict": {{"badge": "Top Pick 🏆", "color": "green", "one_line_summary": "Best overall choice"}},
+                "scores": {{"compensation": 9, "work_life_balance": 8, "growth_potential": 9, "job_stability": 8, "culture_fit": 8}},
+                "key_insights": {{"pros": ["pro1", "pro2"], "cons": ["con1"]}}
+            }}
+        }}
+    ],
+    "top_offer": {{"company": "...", "total_score": 85.5}},
+    "comparison_summary": "Brief 2-3 sentence summary",
+    "comprehensive_analysis": "2-3 paragraph analysis covering key factors",
+    "decision_framework": "Brief 3-4 point decision framework",
+    "score_range": {{"min": 70, "max": 85, "avg": 77}}
+}}
+
+Focus on actionable insights and clear rankings. Be concise but comprehensive.
+"""
+        return prompt
