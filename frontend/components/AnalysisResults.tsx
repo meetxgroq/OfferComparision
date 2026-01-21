@@ -45,6 +45,7 @@ interface AnalysisResultsProps {
 
 export default function AnalysisResults({ results }: AnalysisResultsProps) {
   const [activeTab, setActiveTab] = useState<'ai' | 'charts' | 'table' | 'timeline'>('ai')
+  const [selectedNegotiationOption, setSelectedNegotiationOption] = useState<string | null>(null)
 
   const tabs = [
     { id: 'ai', label: 'AI Recommendations', icon: SparklesIcon },
@@ -157,6 +158,50 @@ export default function AnalysisResults({ results }: AnalysisResultsProps) {
             animate={{ opacity: 1, x: 0 }}
             className="space-y-8 max-w-5xl mx-auto"
           >
+            {/* THE MATH SAYS - Catchy Slogan Section */}
+            {(() => {
+              const verdict = results.final_report?.verdict;
+              const topOffer = results.comparison_results?.top_offer;
+              const netValueAnalysis = results.final_report?.net_value_analysis;
+              
+              // Determine conclusion
+              let conclusion = "Analysis Complete";
+              let explanation = "Review the detailed analysis below.";
+              
+              if (verdict?.recommended_company) {
+                const winner = netValueAnalysis?.offers?.find(
+                  (o: any) => o.offer_id === netValueAnalysis.winner
+                );
+                const discretionaryIncome = winner?.discretionary_income || 0;
+                const delta = winner?.discretionary_income_delta || 0;
+                
+                if (delta > 10000) {
+                  conclusion = `${verdict.recommended_company} Wins`;
+                  explanation = `Financially superior with $${delta.toLocaleString()} more in discretionary income annually.`;
+                } else if (delta > 0) {
+                  conclusion = `${verdict.recommended_company} Leads`;
+                  explanation = `Slightly ahead with $${delta.toLocaleString()} more in discretionary income.`;
+                } else if (Math.abs(delta) < 5000) {
+                  conclusion = "It's a Toss-Up";
+                  explanation = "Both offers are financially similar. Consider non-financial factors.";
+                } else {
+                  conclusion = `${verdict.recommended_company} Recommended`;
+                  explanation = verdict.reasoning?.[0] || "Based on comprehensive analysis.";
+                }
+              } else if (topOffer?.company) {
+                conclusion = `${topOffer.company} is Top Choice`;
+                explanation = `Highest overall score of ${topOffer.total_score?.toFixed(1) || 'N/A'}/100.`;
+              }
+              
+              return (
+                <div className="bg-gradient-to-r from-cyan-600/20 via-blue-600/20 to-purple-600/20 border-2 border-cyan-500/40 rounded-2xl p-8 mb-8 shadow-xl">
+                  <p className="text-cyan-300 text-sm font-bold tracking-widest uppercase mb-3">THE MATH SAYS</p>
+                  <h2 className="text-5xl font-bold text-white mb-4 leading-tight">{conclusion}</h2>
+                  <p className="text-slate-200 text-xl leading-relaxed">{explanation}</p>
+                </div>
+              );
+            })()}
+
             {/* Executive Summary - Styled Distinctly */}
             <div className="bg-gradient-to-br from-indigo-900/40 to-slate-900 p-8 rounded-xl border border-indigo-500/30 shadow-lg">
               <div className="flex items-center space-x-3 mb-6">
@@ -205,11 +250,27 @@ export default function AnalysisResults({ results }: AnalysisResultsProps) {
                           const isLastRow = rowIdx === results.final_report.summary_table.rows.length - 1;
                           const winnerOfferId = results.final_report?.net_value_analysis?.winner;
                           
+                          // Find the winner's company name to match with table headers
+                          const winnerOffer = results.final_report?.net_value_analysis?.offers?.find(
+                            (o: any) => o.offer_id === winnerOfferId
+                          );
+                          const winnerCompany = winnerOffer?.company;
+                          
+                          // Get headers to match column index with company name
+                          const headers = results.final_report.summary_table.headers || [];
+                          
                           return (
                             <tr key={rowIdx} className="hover:bg-slate-800/30 transition-colors">
                               {row.map((cell: string, cellIdx: number) => {
                                 const isDiscretionaryIncome = cell.includes('Discretionary Income');
-                                const isWinner = isLastRow && cellIdx > 0 && winnerOfferId;
+                                // Only show winner tag if:
+                                // 1. It's the last row (Final Discretionary Income)
+                                // 2. It's not the first column (metric label)
+                                // 3. The current column's header matches the winner's company
+                                const isWinner = isLastRow && 
+                                                cellIdx > 0 && 
+                                                winnerCompany && 
+                                                headers[cellIdx] === winnerCompany;
                                 
                                 return (
                                   <td
@@ -223,7 +284,7 @@ export default function AnalysisResults({ results }: AnalysisResultsProps) {
                                     }`}
                                   >
                                     {cell}
-                                    {isWinner && cellIdx > 0 && (
+                                    {isWinner && (
                                       <span className="ml-2 px-2 py-1 bg-green-600/20 text-green-400 text-xs font-semibold rounded border border-green-500/50">
                                         Winner
                                       </span>
@@ -264,6 +325,100 @@ export default function AnalysisResults({ results }: AnalysisResultsProps) {
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* How Your Offer Compares - Percentile Visualization */}
+            {rankedOffers.length > 0 && (
+              <div className="bg-slate-800/30 p-8 rounded-xl border border-slate-700/50">
+                <div className="flex items-center space-x-3 mb-6">
+                  <div className="bg-blue-600/20 p-2 rounded-lg border border-blue-500/50">
+                    <ChartBarIcon className="h-6 w-6 text-blue-400" />
+                  </div>
+                  <div>
+                    <h4 className="text-xl font-bold text-white">How Your Offer Compares</h4>
+                    <p className="text-slate-400 text-sm mt-1">Benchmarked against market data</p>
+                  </div>
+                </div>
+                
+                <div className="space-y-8">
+                  {rankedOffers.map((offer, offerIdx) => {
+                    const marketAnalysis = offer.offer_data?.market_analysis || {};
+                    const totalCompAnalysis = offer.offer_data?.total_comp_analysis || {};
+                    const basePercentile = marketAnalysis.market_percentile || 50;
+                    const totalPercentile = totalCompAnalysis.market_percentile || 50;
+                    const baseSalary = offer.offer_data?.base_salary || 0;
+                    const totalComp = offer.offer_data?.total_compensation || 0;
+                    const medianBase = marketAnalysis.market_range?.median || 0;
+                    const medianTotal = totalCompAnalysis.market_range?.median || 0;
+                    
+                    const getPercentileColor = (percentile: number) => {
+                      if (percentile < 25) return { bg: 'bg-red-500', text: 'text-red-400' };
+                      if (percentile < 50) return { bg: 'bg-orange-500', text: 'text-orange-400' };
+                      if (percentile < 75) return { bg: 'bg-yellow-500', text: 'text-yellow-400' };
+                      return { bg: 'bg-green-500', text: 'text-green-400' };
+                    };
+                    
+                    const baseColor = getPercentileColor(basePercentile);
+                    const totalColor = getPercentileColor(totalPercentile);
+                    
+                    const getOrdinalSuffix = (n: number) => {
+                      const s = ['th', 'st', 'nd', 'rd'];
+                      const v = n % 100;
+                      return n + (s[(v - 20) % 10] || s[v] || s[0]);
+                    };
+                    
+                    return (
+                      <div key={offer.offer_id || offerIdx} className="bg-slate-900/50 border border-slate-700 rounded-lg p-6">
+                        <h5 className="text-lg font-semibold text-white mb-6">{offer.company} - {offer.offer_data?.position || 'Position'}</h5>
+                        
+                        {/* Base Salary Percentile */}
+                        <div className="mb-6">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-slate-300 text-sm font-medium">Base Salary</span>
+                            <span className={`${baseColor.text} font-semibold`}>
+                              {getOrdinalSuffix(Math.round(basePercentile))} percentile
+                            </span>
+                          </div>
+                          <div className="w-full bg-slate-700 rounded-full h-6 mb-2">
+                            <div 
+                              className={`${baseColor.bg} h-6 rounded-full transition-all duration-500`}
+                              style={{ width: `${Math.min(100, Math.max(0, basePercentile))}%` }}
+                            />
+                          </div>
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-slate-400">Your Offer: ${baseSalary.toLocaleString()}</span>
+                            {medianBase > 0 && (
+                              <span className="text-slate-500">Median: ${medianBase.toLocaleString()}</span>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {/* Total Compensation Percentile */}
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-slate-300 text-sm font-medium">Total Compensation</span>
+                            <span className={`${totalColor.text} font-semibold`}>
+                              {getOrdinalSuffix(Math.round(totalPercentile))} percentile
+                            </span>
+                          </div>
+                          <div className="w-full bg-slate-700 rounded-full h-6 mb-2">
+                            <div 
+                              className={`${totalColor.bg} h-6 rounded-full transition-all duration-500`}
+                              style={{ width: `${Math.min(100, Math.max(0, totalPercentile))}%` }}
+                            />
+                          </div>
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-slate-400">Your Offer: ${totalComp.toLocaleString()}</span>
+                            {medianTotal > 0 && (
+                              <span className="text-slate-500">Median: ${medianTotal.toLocaleString()}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
@@ -406,27 +561,117 @@ export default function AnalysisResults({ results }: AnalysisResultsProps) {
               </div>
             )}
 
-            {/* Negotiation Opportunities Section */}
-            {results.final_report?.negotiation_opportunities && Array.isArray(results.final_report.negotiation_opportunities) && results.final_report.negotiation_opportunities.length > 0 && (
-              <div className="bg-gradient-to-br from-amber-900/20 to-slate-900 p-8 rounded-xl border border-amber-500/30 shadow-lg">
-                <div className="flex items-center space-x-3 mb-6">
-                  <div className="bg-amber-600/20 p-2 rounded-lg border border-amber-500/50">
-                    <span className="text-2xl">💼</span>
-                  </div>
-                  <h4 className="text-xl font-bold text-amber-100">Negotiation Opportunities</h4>
-                </div>
-                <div className="space-y-4">
-                  {results.final_report.negotiation_opportunities.map((opportunity: string, idx: number) => (
-                    <div key={idx} className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 flex items-start space-x-3">
-                      <div className="bg-amber-600/20 p-1.5 rounded border border-amber-500/50 flex-shrink-0 mt-0.5">
-                        <span className="text-amber-400 font-bold">{idx + 1}</span>
-                      </div>
-                      <p className="text-slate-300 flex-1">{opportunity}</p>
+            {/* Negotiation Opportunities Section - Interactive Options */}
+            {(() => {
+              const negotiationOptions = results.final_report?.negotiation_options || [];
+              const hasOptions = negotiationOptions.length > 0;
+              
+              // Fallback to simple list if structured options not available
+              const simpleOpportunities = results.final_report?.negotiation_opportunities || [];
+              const hasSimpleList = !hasOptions && Array.isArray(simpleOpportunities) && simpleOpportunities.length > 0;
+              
+              if (!hasOptions && !hasSimpleList) return null;
+              
+              const copyScript = (script: string) => {
+                navigator.clipboard.writeText(script).then(() => {
+                  alert('Script copied to clipboard!');
+                }).catch(() => {
+                  alert('Failed to copy script');
+                });
+              };
+              
+              const selectedOption = negotiationOptions.find((opt: any) => opt.id === selectedNegotiationOption);
+              
+              return (
+                <div className="bg-gradient-to-br from-amber-900/20 to-slate-900 p-8 rounded-xl border border-amber-500/30 shadow-lg">
+                  <div className="flex items-center space-x-3 mb-6">
+                    <div className="bg-amber-600/20 p-2 rounded-lg border border-amber-500/50">
+                      <span className="text-2xl">💼</span>
                     </div>
-                  ))}
+                    <h4 className="text-xl font-bold text-amber-100">Negotiation Opportunities</h4>
+                  </div>
+                  
+                  {hasOptions ? (
+                    <>
+                      <div className="space-y-4 mb-6">
+                        {negotiationOptions.map((option: any) => {
+                          const difficultyColors = {
+                            'likely_achievable': { bg: 'bg-green-600/20', text: 'text-green-400', border: 'border-green-500/50' },
+                            'worth_asking': { bg: 'bg-orange-600/20', text: 'text-orange-400', border: 'border-orange-500/50' },
+                            'ambitious_ask': { bg: 'bg-red-600/20', text: 'text-red-400', border: 'border-red-500/50' }
+                          };
+                          const colors = difficultyColors[option.difficulty as keyof typeof difficultyColors] || difficultyColors.worth_asking;
+                          const isSelected = selectedNegotiationOption === option.id;
+                          
+                          return (
+                            <div
+                              key={option.id}
+                              onClick={() => setSelectedNegotiationOption(isSelected ? null : option.id)}
+                              className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
+                                isSelected
+                                  ? 'border-cyan-500 bg-cyan-900/20 shadow-lg shadow-cyan-500/20'
+                                  : 'border-slate-700 hover:border-slate-600 bg-slate-800/50'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between">
+                                <div className="flex items-start space-x-3 flex-1">
+                                  <input
+                                    type="radio"
+                                    checked={isSelected}
+                                    onChange={() => setSelectedNegotiationOption(isSelected ? null : option.id)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="mt-1 w-4 h-4 text-cyan-600 bg-slate-700 border-slate-600 focus:ring-cyan-500"
+                                  />
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-3 mb-2">
+                                      <span className={`px-2 py-1 rounded text-xs font-semibold ${colors.bg} ${colors.text} border ${colors.border}`}>
+                                        {option.difficulty_label || option.difficulty}
+                                      </span>
+                                    </div>
+                                    <h5 className="text-white font-semibold mb-1">{option.title}</h5>
+                                    <p className="text-slate-400 text-sm">{option.description}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      
+                      {selectedOption && (
+                        <div className="mt-6 bg-slate-900/50 border border-slate-700 rounded-lg p-6">
+                          <div className="flex items-center justify-between mb-4">
+                            <h5 className="text-white font-semibold text-lg">Negotiation Script</h5>
+                            <button
+                              onClick={() => copyScript(selectedOption.script)}
+                              className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                            >
+                              <DocumentArrowDownIcon className="h-4 w-4" />
+                              Copy Script
+                            </button>
+                          </div>
+                          <div className="bg-slate-950 border border-slate-700 rounded-lg p-4 text-slate-300 whitespace-pre-wrap leading-relaxed">
+                            {selectedOption.script}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    // Fallback: Show simple list if structured options not available
+                    <div className="space-y-4">
+                      {simpleOpportunities.map((opportunity: string, idx: number) => (
+                        <div key={idx} className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 flex items-start space-x-3">
+                          <div className="bg-amber-600/20 p-1.5 rounded border border-amber-500/50 flex-shrink-0 mt-0.5">
+                            <span className="text-amber-400 font-bold">{idx + 1}</span>
+                          </div>
+                          <p className="text-slate-300 flex-1">{opportunity}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Decision Framework Section (keep for backward compatibility) */}
             {results.final_report?.decision_framework && (

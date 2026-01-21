@@ -1028,7 +1028,8 @@ class QuickVisualizationNode(Node):
             "lifestyle_comparison": shared.get("lifestyle_comparison", {}),
             "summary_table": shared.get("summary_table", {}),
             "verdict": shared.get("verdict", {}),
-            "negotiation_opportunities": shared.get("negotiation_opportunities", []),
+            "negotiation_options": shared.get("negotiation_options", []),
+            "negotiation_opportunities": shared.get("negotiation_opportunities", []),  # Keep for backward compatibility
             # Old fields for backward compatibility
             "ai_analysis": shared.get("ai_analysis", ""),
             "decision_framework": shared.get("decision_framework", ""),
@@ -1069,7 +1070,8 @@ class QuickVisualizationNode(Node):
             "lifestyle_comparison": prep_data.get("lifestyle_comparison", {}),
             "summary_table": prep_data.get("summary_table", {}),
             "verdict": prep_data.get("verdict", {}),
-            "negotiation_opportunities": prep_data.get("negotiation_opportunities", []),
+            "negotiation_options": prep_data.get("negotiation_options", []),
+            "negotiation_opportunities": prep_data.get("negotiation_opportunities", []),  # Keep for backward compatibility
             # Keep old fields for backward compatibility with full analysis
             "detailed_analysis": prep_data.get("ai_analysis", ""),
             "decision_framework": prep_data.get("decision_framework", ""),
@@ -1408,7 +1410,23 @@ class QuickAIAnalysisNode(AsyncNode):
             lifestyle_comparison = analysis_data.get("lifestyle_comparison", {})
             summary_table = analysis_data.get("summary_table", {})
             verdict = analysis_data.get("verdict", {})
+            # Extract structured negotiation options (preferred) or fallback to simple list
+            negotiation_options = analysis_data.get("negotiation_options", [])
             negotiation_opportunities = analysis_data.get("negotiation_opportunities", [])
+            # If we have structured options, use them; otherwise convert simple list to structured format
+            if not negotiation_options and negotiation_opportunities:
+                negotiation_options = [
+                    {
+                        "id": f"option_{i+1}",
+                        "title": opp.split("·")[0].strip() if "·" in opp else opp,
+                        "description": opp,
+                        "difficulty": "worth_asking",
+                        "difficulty_label": "Worth asking",
+                        "expected_value_impact": 0,
+                        "script": f"Based on the analysis, {opp}"
+                    }
+                    for i, opp in enumerate(negotiation_opportunities) if isinstance(opp, str)
+                ]
             comparison_summary = analysis_data.get("comparison_summary", comparison_results.get("comparison_summary", "Quick analysis completed."))
             
             # Extract per-offer recommendations from LLM (for Smart Analysis Dashboard)
@@ -1462,7 +1480,8 @@ class QuickAIAnalysisNode(AsyncNode):
                 "lifestyle_comparison": lifestyle_comparison,
                 "summary_table": summary_table,
                 "verdict": verdict,
-                "negotiation_opportunities": negotiation_opportunities,
+                "negotiation_options": negotiation_options,
+                "negotiation_opportunities": negotiation_opportunities,  # Keep for backward compatibility
                 "comparison_summary": comparison_summary,
                 "offer_recommendations": offer_recommendations,
                 "comparison_results": comparison_results  # Use properly scored comparison_results
@@ -1525,14 +1544,46 @@ class QuickAIAnalysisNode(AsyncNode):
                 "Review full analysis for detailed insights"
             ]
             
-            # Generate negotiation opportunities
-            negotiation_opportunities = []
+            # Generate structured negotiation options
+            negotiation_options = []
             if len(offers) >= 2:
                 max_gross = max(o.get('total_compensation', 0) for o in offers)
-                if winner_offer and winner_offer.get('total_compensation', 0) < max_gross:
-                    negotiation_opportunities.append(f"Request sign-on bonus to match the higher gross compensation of ${max_gross:,.0f}")
-                negotiation_opportunities.append("Inquire about annual stock refreshers and equity growth potential")
-                negotiation_opportunities.append("Negotiate relocation package if moving to a new location")
+                winner_gross = winner_offer.get('total_compensation', 0) if winner_offer else 0
+                gap = max_gross - winner_gross
+                
+                if gap > 0:
+                    negotiation_options.append({
+                        "id": "option_a",
+                        "title": "Sign-on bonus",
+                        "description": f"${gap:,.0f} one-time · Adds ~${int(gap * 0.7):,} after taxes",
+                        "difficulty": "worth_asking",
+                        "difficulty_label": "Worth asking",
+                        "expected_value_impact": int(gap * 0.7),
+                        "script": f"I'm genuinely excited about this role and the impact I could make on the team. To help bridge the gap with my other opportunities, I'd appreciate consideration for a ${gap:,.0f} sign-on bonus. This would help offset the opportunity cost and demonstrate the company's commitment to my success."
+                    })
+                
+                negotiation_options.append({
+                    "id": "option_b",
+                    "title": "Higher salary",
+                    "description": f"+${int(gap * 0.3):,}/year · Adds ~${int(gap * 0.3 * 4):,} over 4 years",
+                    "difficulty": "likely_achievable",
+                    "difficulty_label": "Likely achievable",
+                    "expected_value_impact": int(gap * 0.3 * 4),
+                    "script": f"I'm genuinely excited about this role and the impact I could make on the team. Given my experience and the value I'll bring, I'd like to discuss increasing the base salary to better align with market rates and my other opportunities."
+                })
+                
+                negotiation_options.append({
+                    "id": "option_c",
+                    "title": "Stock refreshers",
+                    "description": "Inquire about annual equity refreshers · Adds ~$20K-40K/year",
+                    "difficulty": "worth_asking",
+                    "difficulty_label": "Worth asking",
+                    "expected_value_impact": 30000,
+                    "script": "I'm genuinely excited about this role and the impact I could make on the team. I'd like to understand the company's approach to annual stock refreshers and equity growth potential, as this is an important factor in my long-term compensation planning."
+                })
+            
+            # Keep simple list for backward compatibility
+            negotiation_opportunities = [opt["title"] + " · " + opt["description"] for opt in negotiation_options]
             
             # Create basic recommendations
             offer_recommendations = []
@@ -1582,7 +1633,8 @@ class QuickAIAnalysisNode(AsyncNode):
                     "reasoning": verdict_reasoning,
                     "career_growth_considerations": "Evaluate career growth opportunities, company culture, and long-term trajectory at each organization."
                 },
-                "negotiation_opportunities": negotiation_opportunities,
+                "negotiation_options": negotiation_options,
+                "negotiation_opportunities": negotiation_opportunities,  # Keep for backward compatibility
                 "comparison_summary": comparison_results.get("comparison_summary", "Quick analysis completed."),
                 "offer_recommendations": offer_recommendations,
                 "comparison_results": comparison_results
@@ -1619,7 +1671,8 @@ class QuickAIAnalysisNode(AsyncNode):
         shared["net_value_analysis"] = exec_res.get("net_value_analysis", {})
         shared["lifestyle_comparison"] = exec_res.get("lifestyle_comparison", {})
         shared["summary_table"] = exec_res.get("summary_table", {})
-        shared["negotiation_opportunities"] = exec_res.get("negotiation_opportunities", [])
+        shared["negotiation_options"] = exec_res.get("negotiation_options", [])
+        shared["negotiation_opportunities"] = exec_res.get("negotiation_opportunities", [])  # Keep for backward compatibility
         shared["verdict"] = exec_res.get("verdict", {})
         shared["comparison_summary"] = exec_res.get("comparison_summary", comparison_results.get("comparison_summary", ""))
         shared["comparison_results"] = comparison_results
@@ -1674,7 +1727,12 @@ YOUR TASKS - Provide a comprehensive JSON response:
 
 4. Verdict: Provide a clear recommendation with 4-5 bullet points of reasoning, considering both financial superiority and career growth.
 
-5. Negotiation Opportunities: Suggest 2-3 actionable negotiation strategies for the recommended offer.
+5. Negotiation Opportunities: Provide 3-5 structured negotiation options for the recommended offer. Each option should include:
+   - A clear title (e.g., "Higher salary", "Signing bonus", "Accelerated vesting")
+   - Description with expected value impact (e.g., "+$48K/year · Adds ~$133K over 4 years")
+   - Difficulty level: "likely_achievable", "worth_asking", or "ambitious_ask"
+   - Expected value impact in dollars
+   - A personalized negotiation script (2-3 paragraphs) that the user can copy and use
 
 Provide a JSON response with this EXACT structure:
 {{
@@ -1721,11 +1779,27 @@ Provide a JSON response with this EXACT structure:
         ],
         "career_growth_considerations": "Brief analysis comparing career growth opportunities, networking potential, and long-term trajectory at each company"
     }},
-    "negotiation_opportunities": [
-        "Specific negotiation tip 1 (e.g., request sign-on bonus using other offer as leverage)",
-        "Specific negotiation tip 2 (e.g., inquire about stock refreshers)",
-        "Specific negotiation tip 3 (e.g., negotiate relocation package)"
+    "negotiation_options": [
+        {{
+            "id": "option_a",
+            "title": "Higher salary",
+            "description": "+$48K/year · Adds ~$133K over 4 years",
+            "difficulty": "likely_achievable",
+            "difficulty_label": "Likely achievable",
+            "expected_value_impact": 133000,
+            "script": "I'm genuinely excited about this role and the impact I could make on the team. The equity and base salary are compelling, but I want to be transparent about my decision-making. Given my experience and the value I'll bring, I'd like to discuss increasing the base salary to $X, which would better align with market rates and my other opportunities."
+        }},
+        {{
+            "id": "option_b",
+            "title": "Signing bonus",
+            "description": "$50K one-time · Adds ~$35K after taxes",
+            "difficulty": "worth_asking",
+            "difficulty_label": "Worth asking",
+            "expected_value_impact": 35000,
+            "script": "I'm genuinely excited about this role and the impact I could make on the team. To help bridge the gap with my other opportunities and recognize the risk I'm taking in joining at this stage, I'd appreciate consideration for a $X signing bonus. This would help offset the opportunity cost and demonstrate the company's commitment to my success."
+        }}
     ],
+    "negotiation_opportunities": ["Legacy field - use negotiation_options instead"],
     "comparison_summary": "Brief 2-3 sentence summary for executive summary",
     "ranked_offers": [
         {{
