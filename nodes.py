@@ -1023,6 +1023,13 @@ class QuickVisualizationNode(Node):
         return {
             "offers": shared.get("offers", []),
             "comparison_results": shared.get("comparison_results", {}),
+            # New Net Value Analysis fields
+            "net_value_analysis": shared.get("net_value_analysis", {}),
+            "lifestyle_comparison": shared.get("lifestyle_comparison", {}),
+            "summary_table": shared.get("summary_table", {}),
+            "verdict": shared.get("verdict", {}),
+            "negotiation_opportunities": shared.get("negotiation_opportunities", []),
+            # Old fields for backward compatibility
             "ai_analysis": shared.get("ai_analysis", ""),
             "decision_framework": shared.get("decision_framework", ""),
             "scoring_weights": shared.get("scoring_weights", {}),
@@ -1051,14 +1058,21 @@ class QuickVisualizationNode(Node):
         top_offer = comparison_results.get("top_offer", {})
         executive_summary = self._generate_quick_summary(prep_data, top_offer)
         
-        # Generate minimal structured report
+        # Generate minimal structured report with new Net Value Analysis fields
         final_report = {
             "report_type": "OfferCompare Pro Quick Analysis",
             "analysis_date": "2024-01-01",
             "offers_analyzed": len(prep_data["offers"]),
             "top_recommendation": top_offer.get("company", "N/A"),
-            "detailed_analysis": prep_data["ai_analysis"],
-            "decision_framework": prep_data["decision_framework"],
+            # Include new Net Value Analysis fields
+            "net_value_analysis": prep_data.get("net_value_analysis", {}),
+            "lifestyle_comparison": prep_data.get("lifestyle_comparison", {}),
+            "summary_table": prep_data.get("summary_table", {}),
+            "verdict": prep_data.get("verdict", {}),
+            "negotiation_opportunities": prep_data.get("negotiation_opportunities", []),
+            # Keep old fields for backward compatibility with full analysis
+            "detailed_analysis": prep_data.get("ai_analysis", ""),
+            "decision_framework": prep_data.get("decision_framework", ""),
             "offer_rankings": [
                 {
                     "offer_id": r.get("offer_id"),
@@ -1389,11 +1403,15 @@ class QuickAIAnalysisNode(AsyncNode):
             else:
                 analysis_data = structured_response
             
-            # Extract AI insights from LLM response
-            ai_analysis = analysis_data.get("comprehensive_analysis", comparison_results.get("comparison_summary", "Quick analysis completed."))
-            decision_framework = analysis_data.get("decision_framework", "1. Compare Net Pay\n2. Evaluate WLB vs Growth\n3. Consider long-term career trajectory.")
+            # Extract new Net Value Analysis structure from LLM response
+            net_value_analysis = analysis_data.get("net_value_analysis", {})
+            lifestyle_comparison = analysis_data.get("lifestyle_comparison", {})
+            summary_table = analysis_data.get("summary_table", {})
+            verdict = analysis_data.get("verdict", {})
+            negotiation_opportunities = analysis_data.get("negotiation_opportunities", [])
+            comparison_summary = analysis_data.get("comparison_summary", comparison_results.get("comparison_summary", "Quick analysis completed."))
             
-            # Extract per-offer recommendations from LLM
+            # Extract per-offer recommendations from LLM (for Smart Analysis Dashboard)
             offer_recommendations = []
             llm_ranked_offers = analysis_data.get("ranked_offers", [])
             
@@ -1440,20 +1458,83 @@ class QuickAIAnalysisNode(AsyncNode):
             print(f"[DEBUG] QuickAIAnalysis completed at {end_timestamp}, duration: {duration:.2f}s")
             
             return {
-                "comprehensive_analysis": ai_analysis,
+                "net_value_analysis": net_value_analysis,
+                "lifestyle_comparison": lifestyle_comparison,
+                "summary_table": summary_table,
+                "verdict": verdict,
+                "negotiation_opportunities": negotiation_opportunities,
+                "comparison_summary": comparison_summary,
                 "offer_recommendations": offer_recommendations,
-                "comparison_results": comparison_results,  # Use properly scored comparison_results
-                "decision_framework": decision_framework,
-                # Aliases for compatibility
-                "ai_analysis": ai_analysis
+                "comparison_results": comparison_results  # Use properly scored comparison_results
             }
             
         except Exception as e:
             error_str = str(e)
             print(f"[WARNING] Quick AI Analysis LLM call failed: {error_str[:100]}...")
-            print("[INFO] Using calculated scores and basic recommendations")
+            print("[INFO] Generating fallback Net Value Analysis from calculated data")
             
-            # Create basic recommendations based on calculated scores
+            # Generate structured fallback using calculated data
+            net_value_offers = []
+            winner_id = None
+            winner_discretionary = -float('inf')
+            
+            for offer in offers:
+                net_pay = offer.get('estimated_net_pay', 0)
+                annual_expenses = offer.get('estimated_annual_expenses', 0)
+                gross_total = offer.get('total_compensation', 0)
+                estimated_tax = gross_total - net_pay
+                discretionary_income = net_pay - annual_expenses
+                
+                net_value_offers.append({
+                    "offer_id": offer["id"],
+                    "company": offer.get("company", "Unknown"),
+                    "gross_total": gross_total,
+                    "estimated_tax": estimated_tax,
+                    "net_annual": net_pay,
+                    "annual_col": annual_expenses,
+                    "discretionary_income": discretionary_income,
+                    "discretionary_income_delta": 0  # Will calculate below
+                })
+                
+                if discretionary_income > winner_discretionary:
+                    winner_discretionary = discretionary_income
+                    winner_id = offer["id"]
+            
+            # Calculate deltas
+            if len(net_value_offers) > 1:
+                max_discretionary = max(o["discretionary_income"] for o in net_value_offers)
+                for offer_data in net_value_offers:
+                    offer_data["discretionary_income_delta"] = offer_data["discretionary_income"] - max_discretionary
+            
+            # Build summary table
+            table_headers = ["Metric"] + [o.get("company", "Unknown") for o in offers]
+            table_rows = []
+            if len(offers) >= 2:
+                table_rows.append(["Gross Total (Inc. Equity)"] + [f"${o.get('total_compensation', 0):,}" for o in offers])
+                table_rows.append(["Estimated Tax Amount"] + [f"${net_value_offers[i].get('estimated_tax', 0):,}" for i in range(len(offers))])
+                table_rows.append(["Net Take-Home"] + [f"${o.get('estimated_net_pay', 0):,}" for o in offers])
+                table_rows.append(["Annual CoL"] + [f"${o.get('estimated_annual_expenses', 0):,}" for o in offers])
+                table_rows.append(["Final Discretionary Income"] + [f"${o.get('discretionary_income', 0):,}" for o in net_value_offers])
+            
+            # Create basic verdict
+            winner_offer = next((o for o in offers if o["id"] == winner_id), offers[0] if offers else None)
+            verdict_reasoning = [
+                f"{winner_offer.get('company', 'Unknown')} offers ${winner_discretionary:,.0f} in discretionary income",
+                "Based on calculated net pay and cost of living analysis",
+                "Consider work-life balance and career growth opportunities",
+                "Review full analysis for detailed insights"
+            ]
+            
+            # Generate negotiation opportunities
+            negotiation_opportunities = []
+            if len(offers) >= 2:
+                max_gross = max(o.get('total_compensation', 0) for o in offers)
+                if winner_offer and winner_offer.get('total_compensation', 0) < max_gross:
+                    negotiation_opportunities.append(f"Request sign-on bonus to match the higher gross compensation of ${max_gross:,.0f}")
+                negotiation_opportunities.append("Inquire about annual stock refreshers and equity growth potential")
+                negotiation_opportunities.append("Negotiate relocation package if moving to a new location")
+            
+            # Create basic recommendations
             offer_recommendations = []
             for offer in offers:
                 score_data = offer.get("score_data", {})
@@ -1481,11 +1562,30 @@ class QuickAIAnalysisNode(AsyncNode):
                 })
             
             return {
-                "comprehensive_analysis": comparison_results.get("comparison_summary", "Quick analysis completed."),
+                "net_value_analysis": {
+                    "offers": net_value_offers,
+                    "winner": winner_id,
+                    "winner_discretionary_income": winner_discretionary
+                },
+                "lifestyle_comparison": {
+                    "location_tradeoffs": f"Compare locations: {', '.join([o.get('location', 'Unknown') for o in offers])}. Consider tax implications, cost of living, and quality of life factors.",
+                    "hidden_costs": "Consider additional costs such as transportation, childcare, and local taxes when evaluating offers."
+                },
+                "summary_table": {
+                    "headers": table_headers,
+                    "rows": table_rows
+                },
+                "verdict": {
+                    "recommended_offer_id": winner_id,
+                    "recommended_company": winner_offer.get("company", "Unknown") if winner_offer else "Unknown",
+                    "financial_superiority": winner_offer.get("company", "Unknown") if winner_offer else "Unknown",
+                    "reasoning": verdict_reasoning,
+                    "career_growth_considerations": "Evaluate career growth opportunities, company culture, and long-term trajectory at each organization."
+                },
+                "negotiation_opportunities": negotiation_opportunities,
+                "comparison_summary": comparison_results.get("comparison_summary", "Quick analysis completed."),
                 "offer_recommendations": offer_recommendations,
-                "comparison_results": comparison_results,  # Use properly scored comparison_results
-                "decision_framework": "1. Compare Net Pay\n2. Evaluate WLB vs Growth\n3. Consider long-term career trajectory.",
-                "ai_analysis": comparison_results.get("comparison_summary", "")
+                "comparison_results": comparison_results
             }
     
     async def post_async(self, shared, prep_res, exec_res):
@@ -1515,65 +1615,129 @@ class QuickAIAnalysisNode(AsyncNode):
                 if offer_id in rec_lookup:
                     ranked_offer["ai_recommendation"] = rec_lookup[offer_id]
         
-        # Store comprehensive analysis
-        shared["ai_analysis"] = exec_res["comprehensive_analysis"]
+        # Store new Net Value Analysis fields directly in shared state
+        shared["net_value_analysis"] = exec_res.get("net_value_analysis", {})
+        shared["lifestyle_comparison"] = exec_res.get("lifestyle_comparison", {})
+        shared["summary_table"] = exec_res.get("summary_table", {})
+        shared["negotiation_opportunities"] = exec_res.get("negotiation_opportunities", [])
+        shared["verdict"] = exec_res.get("verdict", {})
+        shared["comparison_summary"] = exec_res.get("comparison_summary", comparison_results.get("comparison_summary", ""))
         shared["comparison_results"] = comparison_results
-        shared["decision_framework"] = exec_res["decision_framework"]
         shared["scoring_weights"] = prep_res["scoring_weights"]
         
         print("Quick AI analysis completed")
         return "default"
     
     def _build_quick_analysis_prompt(self, offers, user_preferences, weights):
-        """Build concise prompt for quick analysis."""
+        """Build Net Value Analysis prompt for quick analysis."""
         prompt = f"""
-Analyze these {len(offers)} job offers and provide a comprehensive JSON response with scoring, rankings, and recommendations.
+Act as a senior financial advisor and career coach. Conduct a "Net Value Analysis" comparing {len(offers)} job offers to determine which provides better quality of life and financial outlook.
 
 USER PRIORITIES: {user_preferences}
 
 OFFERS DATA:
 """
-        for offer in offers:
+        for i, offer in enumerate(offers, 1):
             net_pay = offer.get('estimated_net_pay', 0)
-            net_pay_str = f"${net_pay:,}" if net_pay > 0 else "N/A"
-            market_pct = offer.get('market_analysis', {}).get('market_percentile', 'N/A')
+            annual_expenses = offer.get('estimated_annual_expenses', 0)
+            net_savings = offer.get('net_savings', 0)
+            tax_rate = offer.get('net_pay_analysis', {}).get('effective_tax_rate', 0)
+            tax_rate_pct = f"{tax_rate * 100:.1f}%" if tax_rate > 0 else "N/A"
             
             prompt += f"""
-{offer.get('company', 'Unknown')} - {offer.get('position', 'Unknown')} ({offer.get('location', 'Unknown')})
+Offer {i}:
+- Company: {offer.get('company', 'Unknown')}
+- Position: {offer.get('position', 'Unknown')}
+- Location: {offer.get('location', 'Unknown')}
 - Base Salary: ${offer.get('base_salary', 0):,}
-- Total Comp: ${offer.get('total_compensation', 0):,}
-- Estimated Net Pay: {net_pay_str}
-- Net Savings: ${offer.get('net_savings', 0):,}
-- Market Percentile: {market_pct}
+- Equity/Year: ${offer.get('equity', 0):,}
+- Bonus: ${offer.get('bonus', 0):,}
+- Gross Total (Salary + Equity + Bonus): ${offer.get('total_compensation', 0):,}
+- Estimated Tax Rate: {tax_rate_pct}
+- Estimated Net Pay (After Tax): ${net_pay:,}
+- Monthly Cost of Living: ${annual_expenses / 12:,.0f} (Annual: ${annual_expenses:,})
+- Net Savings (Discretionary Income): ${net_savings:,}
+- Market Percentile: {offer.get('market_analysis', {}).get('market_percentile', 'N/A')}
 - WLB Score: {offer.get('wlb_score', 'N/A')}
 - Growth Score: {offer.get('growth_score', 'N/A')}
 """
         
         prompt += f"""
 
-Provide a JSON response with this structure:
+YOUR TASKS - Provide a comprehensive JSON response:
+
+1. Net Value Analysis: Calculate and compare discretionary income (Net Pay - Annual CoL) for each offer. Identify the financial winner.
+
+2. Lifestyle Comparison: Analyze location trade-offs, hidden costs, and quality of life factors for each location.
+
+3. Summary Table: Create a side-by-side comparison table with key financial metrics.
+
+4. Verdict: Provide a clear recommendation with 4-5 bullet points of reasoning, considering both financial superiority and career growth.
+
+5. Negotiation Opportunities: Suggest 2-3 actionable negotiation strategies for the recommended offer.
+
+Provide a JSON response with this EXACT structure:
 {{
+    "net_value_analysis": {{
+        "offers": [
+            {{
+                "offer_id": "offer_1",
+                "company": "Company Name",
+                "gross_total": 275000,
+                "estimated_tax": 71500,
+                "net_annual": 203500,
+                "annual_col": 54000,
+                "discretionary_income": 149500,
+                "discretionary_income_delta": 14650
+            }}
+        ],
+        "winner": "offer_1",
+        "winner_discretionary_income": 149500
+    }},
+    "lifestyle_comparison": {{
+        "location_tradeoffs": "Formatted markdown text comparing locations, highlighting upsides and downsides of each location (tax implications, cost of living, quality of life, networking opportunities, weather, etc.)",
+        "hidden_costs": "List of hidden costs to consider for these specific locations (e.g., higher gas prices, sales tax, childcare costs, traffic congestion, etc.)"
+    }},
+    "summary_table": {{
+        "headers": ["Metric", "Company 1 (Location)", "Company 2 (Location)"],
+        "rows": [
+            ["Gross Total (Inc. Equity)", "$275,000", "$309,000"],
+            ["Estimated Tax Amount", "$71,500", "$108,150"],
+            ["Net Take-Home", "$203,500", "$200,850"],
+            ["Annual CoL", "$54,000", "$66,000"],
+            ["Final Discretionary Income", "$149,500", "$134,850"]
+        ]
+    }},
+    "verdict": {{
+        "recommended_offer_id": "offer_1",
+        "recommended_company": "Company Name",
+        "financial_superiority": "Company Name",
+        "reasoning": [
+            "Point 1: Financial advantage explanation",
+            "Point 2: Tax/location benefit",
+            "Point 3: Work-life balance consideration",
+            "Point 4: Career growth or equity stability",
+            "Point 5: Long-term outlook"
+        ],
+        "career_growth_considerations": "Brief analysis comparing career growth opportunities, networking potential, and long-term trajectory at each company"
+    }},
+    "negotiation_opportunities": [
+        "Specific negotiation tip 1 (e.g., request sign-on bonus using other offer as leverage)",
+        "Specific negotiation tip 2 (e.g., inquire about stock refreshers)",
+        "Specific negotiation tip 3 (e.g., negotiate relocation package)"
+    ],
+    "comparison_summary": "Brief 2-3 sentence summary for executive summary",
     "ranked_offers": [
         {{
             "offer_id": "offer_1",
             "company": "Company Name",
             "position": "Position",
             "total_score": 85.5,
-            "rank": 1,
-            "recommendation": {{
-                "verdict": {{"badge": "Top Pick 🏆", "color": "green", "one_line_summary": "Best overall choice"}},
-                "scores": {{"compensation": 9, "work_life_balance": 8, "growth_potential": 9, "job_stability": 8, "culture_fit": 8}},
-                "key_insights": {{"pros": ["pro1", "pro2"], "cons": ["con1"]}}
-            }}
+            "rank": 1
         }}
-    ],
-    "top_offer": {{"company": "...", "total_score": 85.5}},
-    "comparison_summary": "Brief 2-3 sentence summary",
-    "comprehensive_analysis": "2-3 paragraph analysis covering key factors",
-    "decision_framework": "Brief 3-4 point decision framework",
-    "score_range": {{"min": 70, "max": 85, "avg": 77}}
+    ]
 }}
 
-Focus on actionable insights and clear rankings. Be concise but comprehensive.
+Be objective, highlight hidden costs, and provide actionable insights. Focus on real financial impact and quality of life.
 """
         return prompt

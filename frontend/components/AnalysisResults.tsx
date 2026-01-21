@@ -177,53 +177,286 @@ export default function AnalysisResults({ results }: AnalysisResultsProps) {
               </div>
             </div>
 
-            {/* AI Analysis Section */}
-            <div className="bg-slate-800/30 p-8 rounded-xl border border-slate-700/50">
-              <h4 className="text-xl font-bold text-white mb-6 border-b border-slate-700 pb-3">🤖 Comprehensive Analysis</h4>
-              <div className="prose prose-invert prose-lg max-w-none text-slate-300">
-                <ReactMarkdown
-                  components={{
-                    h3: ({ children }) => <h3 className="text-cyan-400 font-semibold mt-6 mb-3">{children}</h3>,
-                    ul: ({ children }) => <ul className="list-disc list-inside space-y-2 mb-4">{children}</ul>,
-                    li: ({ children }) => <li className="marker:text-slate-500">{children}</li>,
-                    strong: ({ children }) => <span className="text-white font-semibold">{children}</span>,
-                    p: ({ children }) => <p className="mb-4">{children}</p>
-                  }}
-                >
-                  {typeof results.final_report?.detailed_analysis === 'string' 
-                    ? results.final_report.detailed_analysis 
-                    : String(results.final_report?.detailed_analysis || '')}
-                </ReactMarkdown>
-              </div>
-            </div>
+            {/* Net Value Analysis Section */}
+            {results.final_report?.net_value_analysis && (
+              <div className="bg-gradient-to-br from-green-900/30 to-slate-900 p-8 rounded-xl border border-green-500/30 shadow-lg">
+                <div className="flex items-center space-x-3 mb-6">
+                  <div className="bg-green-600/20 p-2 rounded-lg border border-green-500/50">
+                    <span className="text-2xl">💰</span>
+                  </div>
+                  <h4 className="text-xl font-bold text-green-100">Net Value Analysis</h4>
+                </div>
+                
+                {/* Summary Table */}
+                {results.final_report?.summary_table?.headers && results.final_report?.summary_table?.rows && (
+                  <div className="mb-6 overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-800/50 border-b border-slate-700">
+                          {results.final_report.summary_table.headers.map((header: string, idx: number) => (
+                            <th key={idx} className={`p-4 font-semibold ${idx === 0 ? 'text-slate-300' : 'text-white'}`}>
+                              {header}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-700">
+                        {results.final_report.summary_table.rows.map((row: string[], rowIdx: number) => {
+                          const isLastRow = rowIdx === results.final_report.summary_table.rows.length - 1;
+                          const winnerOfferId = results.final_report?.net_value_analysis?.winner;
+                          
+                          return (
+                            <tr key={rowIdx} className="hover:bg-slate-800/30 transition-colors">
+                              {row.map((cell: string, cellIdx: number) => {
+                                const isDiscretionaryIncome = cell.includes('Discretionary Income');
+                                const isWinner = isLastRow && cellIdx > 0 && winnerOfferId;
+                                
+                                return (
+                                  <td
+                                    key={cellIdx}
+                                    className={`p-4 ${
+                                      cellIdx === 0
+                                        ? 'text-slate-300 font-medium'
+                                        : isLastRow && isDiscretionaryIncome
+                                        ? 'text-green-400 font-bold text-lg'
+                                        : 'text-slate-200'
+                                    }`}
+                                  >
+                                    {cell}
+                                    {isWinner && cellIdx > 0 && (
+                                      <span className="ml-2 px-2 py-1 bg-green-600/20 text-green-400 text-xs font-semibold rounded border border-green-500/50">
+                                        Winner
+                                      </span>
+                                    )}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
 
-            {/* Decision Framework Section */}
-            <div className="bg-slate-800/30 p-8 rounded-xl border border-slate-700/50">
-              <h4 className="text-xl font-bold text-white mb-6 border-b border-slate-700 pb-3">📋 Decision Framework</h4>
-              <div className="prose prose-invert prose-lg max-w-none text-slate-300">
-                <ReactMarkdown
-                  components={{
-                    h3: ({ children }) => <h3 className="text-emerald-400 font-semibold mt-6 mb-3">{children}</h3>,
-                    ul: ({ children }) => <ul className="list-disc list-inside space-y-2 mb-4">{children}</ul>,
-                    li: ({ children }) => <li className="marker:text-slate-500">{children}</li>,
-                    strong: ({ children }) => <span className="text-white font-semibold">{children}</span>,
-                    p: ({ children }) => <p className="mb-4">{children}</p>
-                  }}
-                >
-                  {(() => {
-                    const framework = results.final_report?.decision_framework;
-                    if (typeof framework === 'string') {
-                      // Convert comma-separated list to markdown list if needed
-                      if (framework.includes(',') && !framework.includes('\n') && !framework.includes('-')) {
-                        return framework.split(',').map(item => item.trim()).filter(Boolean).map(item => `- ${item}`).join('\n');
-                      }
-                      return framework;
-                    }
-                    return String(framework || '');
-                  })()}
-                </ReactMarkdown>
+                {/* Discretionary Income Highlight */}
+                {results.final_report?.net_value_analysis?.winner && (
+                  <div className="bg-green-600/10 border border-green-500/30 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-green-300 text-sm font-medium">Financial Winner</p>
+                        <p className="text-green-100 text-2xl font-bold mt-1">
+                          {(() => {
+                            const winnerId = results.final_report.net_value_analysis.winner;
+                            const winnerOffer = results.final_report.net_value_analysis.offers?.find(
+                              (o: any) => o.offer_id === winnerId
+                            );
+                            return winnerOffer?.company || 'Unknown';
+                          })()}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-green-300 text-sm font-medium">Discretionary Income</p>
+                        <p className="text-green-100 text-3xl font-bold mt-1">
+                          ${results.final_report.net_value_analysis.winner_discretionary_income?.toLocaleString() || '0'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
+            )}
+
+            {/* Lifestyle & Location Comparison Section */}
+            {results.final_report?.lifestyle_comparison && (
+              <div className="bg-slate-800/30 p-8 rounded-xl border border-slate-700/50">
+                <div className="flex items-center space-x-3 mb-6">
+                  <div className="bg-blue-600/20 p-2 rounded-lg border border-blue-500/50">
+                    <span className="text-2xl">🌍</span>
+                  </div>
+                  <h4 className="text-xl font-bold text-white">Lifestyle & Location Comparison</h4>
+                </div>
+                
+                {results.final_report.lifestyle_comparison.location_tradeoffs && (
+                  <div className="mb-6">
+                    <h5 className="text-lg font-semibold text-cyan-400 mb-3">Location Trade-offs</h5>
+                    <div className="prose prose-invert prose-lg max-w-none text-slate-300">
+                      <ReactMarkdown
+                        components={{
+                          p: ({ children }) => <p className="mb-4">{children}</p>,
+                          ul: ({ children }) => <ul className="list-disc list-inside space-y-2 mb-4">{children}</ul>,
+                          li: ({ children }) => <li className="marker:text-slate-500">{children}</li>,
+                          strong: ({ children }) => <span className="text-white font-semibold">{children}</span>,
+                        }}
+                      >
+                        {typeof results.final_report.lifestyle_comparison.location_tradeoffs === 'string'
+                          ? results.final_report.lifestyle_comparison.location_tradeoffs
+                          : String(results.final_report.lifestyle_comparison.location_tradeoffs || '')}
+                      </ReactMarkdown>
+                    </div>
+                  </div>
+                )}
+
+                {results.final_report.lifestyle_comparison.hidden_costs && (
+                  <div className="bg-amber-900/20 border border-amber-500/30 rounded-lg p-4">
+                    <div className="flex items-start space-x-3">
+                      <span className="text-amber-400 text-xl">⚠️</span>
+                      <div>
+                        <h5 className="text-lg font-semibold text-amber-300 mb-2">Hidden Costs to Consider</h5>
+                        <div className="prose prose-invert text-slate-300">
+                          <ReactMarkdown
+                            components={{
+                              p: ({ children }) => <p className="mb-2">{children}</p>,
+                              ul: ({ children }) => <ul className="list-disc list-inside space-y-1">{children}</ul>,
+                              li: ({ children }) => <li className="marker:text-amber-500">{children}</li>,
+                            }}
+                          >
+                            {typeof results.final_report.lifestyle_comparison.hidden_costs === 'string'
+                              ? results.final_report.lifestyle_comparison.hidden_costs
+                              : String(results.final_report.lifestyle_comparison.hidden_costs || '')}
+                          </ReactMarkdown>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Verdict & Recommendation Section (replaces Comprehensive Analysis) */}
+            {results.final_report?.verdict && (
+              <div className="bg-slate-800/30 p-8 rounded-xl border border-slate-700/50">
+                <div className="flex items-center space-x-3 mb-6">
+                  <div className="bg-purple-600/20 p-2 rounded-lg border border-purple-500/50">
+                    <span className="text-2xl">🎯</span>
+                  </div>
+                  <h4 className="text-xl font-bold text-white">Verdict & Recommendation</h4>
+                </div>
+
+                {/* Recommended Offer Badge */}
+                {results.final_report.verdict.recommended_company && (
+                  <div className="mb-6 bg-gradient-to-r from-purple-600/20 to-blue-600/20 border border-purple-500/30 rounded-lg p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-purple-300 text-sm font-medium mb-1">Recommended Offer</p>
+                        <p className="text-white text-3xl font-bold">
+                          {results.final_report.verdict.recommended_company}
+                        </p>
+                        {results.final_report.verdict.financial_superiority && (
+                          <p className="text-green-400 text-sm mt-2">
+                            ✓ Financially Superior
+                          </p>
+                        )}
+                      </div>
+                      <div className="bg-purple-600/30 px-4 py-2 rounded-lg border border-purple-500/50">
+                        <span className="text-purple-200 text-4xl">🏆</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Reasoning */}
+                {results.final_report.verdict.reasoning && Array.isArray(results.final_report.verdict.reasoning) && (
+                  <div className="mb-6">
+                    <h5 className="text-lg font-semibold text-cyan-400 mb-4">Key Reasoning</h5>
+                    <ul className="space-y-3">
+                      {results.final_report.verdict.reasoning.map((point: string, idx: number) => (
+                        <li key={idx} className="flex items-start space-x-3">
+                          <span className="text-green-400 text-xl mt-1">✓</span>
+                          <span className="text-slate-300 flex-1">{point}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Career Growth Considerations */}
+                {results.final_report.verdict.career_growth_considerations && (
+                  <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-4">
+                    <h5 className="text-lg font-semibold text-emerald-400 mb-2">Career Growth Considerations</h5>
+                    <p className="text-slate-300">
+                      {typeof results.final_report.verdict.career_growth_considerations === 'string'
+                        ? results.final_report.verdict.career_growth_considerations
+                        : String(results.final_report.verdict.career_growth_considerations || '')}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Fallback: Show old Comprehensive Analysis if new structure not available */}
+            {!results.final_report?.verdict && results.final_report?.detailed_analysis && (
+              <div className="bg-slate-800/30 p-8 rounded-xl border border-slate-700/50">
+                <h4 className="text-xl font-bold text-white mb-6 border-b border-slate-700 pb-3">🤖 Comprehensive Analysis</h4>
+                <div className="prose prose-invert prose-lg max-w-none text-slate-300">
+                  <ReactMarkdown
+                    components={{
+                      h3: ({ children }) => <h3 className="text-cyan-400 font-semibold mt-6 mb-3">{children}</h3>,
+                      ul: ({ children }) => <ul className="list-disc list-inside space-y-2 mb-4">{children}</ul>,
+                      li: ({ children }) => <li className="marker:text-slate-500">{children}</li>,
+                      strong: ({ children }) => <span className="text-white font-semibold">{children}</span>,
+                      p: ({ children }) => <p className="mb-4">{children}</p>
+                    }}
+                  >
+                    {typeof results.final_report?.detailed_analysis === 'string' 
+                      ? results.final_report.detailed_analysis 
+                      : String(results.final_report?.detailed_analysis || '')}
+                  </ReactMarkdown>
+                </div>
+              </div>
+            )}
+
+            {/* Negotiation Opportunities Section */}
+            {results.final_report?.negotiation_opportunities && Array.isArray(results.final_report.negotiation_opportunities) && results.final_report.negotiation_opportunities.length > 0 && (
+              <div className="bg-gradient-to-br from-amber-900/20 to-slate-900 p-8 rounded-xl border border-amber-500/30 shadow-lg">
+                <div className="flex items-center space-x-3 mb-6">
+                  <div className="bg-amber-600/20 p-2 rounded-lg border border-amber-500/50">
+                    <span className="text-2xl">💼</span>
+                  </div>
+                  <h4 className="text-xl font-bold text-amber-100">Negotiation Opportunities</h4>
+                </div>
+                <div className="space-y-4">
+                  {results.final_report.negotiation_opportunities.map((opportunity: string, idx: number) => (
+                    <div key={idx} className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 flex items-start space-x-3">
+                      <div className="bg-amber-600/20 p-1.5 rounded border border-amber-500/50 flex-shrink-0 mt-0.5">
+                        <span className="text-amber-400 font-bold">{idx + 1}</span>
+                      </div>
+                      <p className="text-slate-300 flex-1">{opportunity}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Decision Framework Section (keep for backward compatibility) */}
+            {results.final_report?.decision_framework && (
+              <div className="bg-slate-800/30 p-8 rounded-xl border border-slate-700/50">
+                <h4 className="text-xl font-bold text-white mb-6 border-b border-slate-700 pb-3">📋 Decision Framework</h4>
+                <div className="prose prose-invert prose-lg max-w-none text-slate-300">
+                  <ReactMarkdown
+                    components={{
+                      h3: ({ children }) => <h3 className="text-emerald-400 font-semibold mt-6 mb-3">{children}</h3>,
+                      ul: ({ children }) => <ul className="list-disc list-inside space-y-2 mb-4">{children}</ul>,
+                      li: ({ children }) => <li className="marker:text-slate-500">{children}</li>,
+                      strong: ({ children }) => <span className="text-white font-semibold">{children}</span>,
+                      p: ({ children }) => <p className="mb-4">{children}</p>
+                    }}
+                  >
+                    {(() => {
+                      const framework = results.final_report?.decision_framework;
+                      if (typeof framework === 'string') {
+                        // Convert comma-separated list to markdown list if needed
+                        if (framework.includes(',') && !framework.includes('\n') && !framework.includes('-')) {
+                          return framework.split(',').map(item => item.trim()).filter(Boolean).map(item => `- ${item}`).join('\n');
+                        }
+                        return framework;
+                      }
+                      return String(framework || '');
+                    })()}
+                  </ReactMarkdown>
+                </div>
+              </div>
+            )}
 
             {/* Visual Dashboard Loop */}
             <div className="space-y-8">
