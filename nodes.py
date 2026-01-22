@@ -36,7 +36,7 @@ class OfferCollectionNode(Node):
         """Collect offer information from user with comprehensive validation."""
         offers = []
         
-        print("\nWelcome to OfferCompare Pro - Intelligent Job Offer Analysis!")
+        print("\nWelcome to BenchMarked - Intelligent Job Offer Analysis!")
         print("=" * 60)
         
         # Collect user preferences first
@@ -917,7 +917,7 @@ class ReportGenerationNode(Node):
         
         # Display executive summary
         print("\n" + "="*80)
-        print("OFFERCOMPARE PRO - EXECUTIVE SUMMARY")
+        print("BENCHMARKED - EXECUTIVE SUMMARY")
         print("="*80)
         print(exec_res["executive_summary"])
         print("\n" + "="*80)
@@ -958,7 +958,7 @@ class ReportGenerationNode(Node):
             enriched_rankings.append(enriched_ranking)
         
         report = {
-            "report_type": "OfferCompare Pro Analysis",
+            "report_type": "BenchMarked Analysis",
             "analysis_date": "2024-01-01",
             "offers_analyzed": len(offers),
             "top_recommendation": comparison_results.get("top_offer", {}).get("company", "N/A"),
@@ -1030,6 +1030,7 @@ class QuickVisualizationNode(Node):
             "verdict": shared.get("verdict", {}),
             "negotiation_options": shared.get("negotiation_options", []),
             "negotiation_opportunities": shared.get("negotiation_opportunities", []),  # Keep for backward compatibility
+            "reality_checks": shared.get("reality_checks", {}),
             # Old fields for backward compatibility
             "ai_analysis": shared.get("ai_analysis", ""),
             "decision_framework": shared.get("decision_framework", ""),
@@ -1061,7 +1062,7 @@ class QuickVisualizationNode(Node):
         
         # Generate minimal structured report with new Net Value Analysis fields
         final_report = {
-            "report_type": "OfferCompare Pro Quick Analysis",
+            "report_type": "BenchMarked Quick Analysis",
             "analysis_date": "2024-01-01",
             "offers_analyzed": len(prep_data["offers"]),
             "top_recommendation": top_offer.get("company", "N/A"),
@@ -1108,7 +1109,7 @@ class QuickVisualizationNode(Node):
         
         print(f"Prepared {exec_res['chart_count']} essential visualizations")
         print("\n" + "="*80)
-        print("OFFERCOMPARE PRO - QUICK ANALYSIS SUMMARY")
+        print("BENCHMARKED - QUICK ANALYSIS SUMMARY")
         print("="*80)
         print(exec_res["executive_summary"])
         print("\n" + "="*80)
@@ -1410,6 +1411,7 @@ class QuickAIAnalysisNode(AsyncNode):
             lifestyle_comparison = analysis_data.get("lifestyle_comparison", {})
             summary_table = analysis_data.get("summary_table", {})
             verdict = analysis_data.get("verdict", {})
+            reality_checks = analysis_data.get("reality_checks", {})
             # Extract structured negotiation options (preferred) or fallback to simple list
             negotiation_options = analysis_data.get("negotiation_options", [])
             negotiation_opportunities = analysis_data.get("negotiation_opportunities", [])
@@ -1482,6 +1484,7 @@ class QuickAIAnalysisNode(AsyncNode):
                 "verdict": verdict,
                 "negotiation_options": negotiation_options,
                 "negotiation_opportunities": negotiation_opportunities,  # Keep for backward compatibility
+                "reality_checks": reality_checks,
                 "comparison_summary": comparison_summary,
                 "offer_recommendations": offer_recommendations,
                 "comparison_results": comparison_results  # Use properly scored comparison_results
@@ -1635,6 +1638,16 @@ class QuickAIAnalysisNode(AsyncNode):
                 },
                 "negotiation_options": negotiation_options,
                 "negotiation_opportunities": negotiation_opportunities,  # Keep for backward compatibility
+                "reality_checks": {
+                    "red_flags": [
+                        "Equity may be diluted in future funding rounds",
+                        "High cost of living area may reduce purchasing power"
+                    ],
+                    "considerations": [
+                        "Consider vesting schedule and cliff period",
+                        "Evaluate company growth trajectory"
+                    ]
+                },
                 "comparison_summary": comparison_results.get("comparison_summary", "Quick analysis completed."),
                 "offer_recommendations": offer_recommendations,
                 "comparison_results": comparison_results
@@ -1673,6 +1686,7 @@ class QuickAIAnalysisNode(AsyncNode):
         shared["summary_table"] = exec_res.get("summary_table", {})
         shared["negotiation_options"] = exec_res.get("negotiation_options", [])
         shared["negotiation_opportunities"] = exec_res.get("negotiation_opportunities", [])  # Keep for backward compatibility
+        shared["reality_checks"] = exec_res.get("reality_checks", {})
         shared["verdict"] = exec_res.get("verdict", {})
         shared["comparison_summary"] = exec_res.get("comparison_summary", comparison_results.get("comparison_summary", ""))
         shared["comparison_results"] = comparison_results
@@ -1733,6 +1747,10 @@ YOUR TASKS - Provide a comprehensive JSON response:
    - Difficulty level: "likely_achievable", "worth_asking", or "ambitious_ask"
    - Expected value impact in dollars
    - A personalized negotiation script (2-3 paragraphs) that the user can copy and use
+
+6. Reality Checks: Identify potential red flags and important considerations for each offer. Include:
+   - Red flags: Critical warnings or concerns (e.g., "Equity may be diluted in future funding rounds", "High cost of living may reduce purchasing power")
+   - Considerations: Important factors to keep in mind (e.g., "Consider vesting schedule and cliff period", "Evaluate company growth trajectory")
 
 Provide a JSON response with this EXACT structure:
 {{

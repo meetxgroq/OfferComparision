@@ -1,4 +1,4 @@
-# Design Doc: OfferCompare Pro - Intelligent Job Offer Analysis Platform
+# Design Doc: BenchMarked - Intelligent Job Offer Analysis Platform
 
 ## Requirements
 
@@ -349,3 +349,52 @@ class AIAnalysisNode(AsyncNode):
         shared["ai_analysis"] = exec_res
 ```
 
+## Visualization Enhancements
+
+### Executive Summary Score Visualization
+
+The Executive Summary section now includes comprehensive score visualizations:
+
+- **Score Comparison Bars**: Horizontal animated bars showing each offer's total score (0-100 scale)
+  - Top offer highlighted with green gradient and "Top" badge
+  - Other offers displayed with neutral gradient
+  - Smooth animations on load with staggered delays
+
+- **Score Statistics Panel**: 
+  - Top Score display with company name
+  - Average Score across all offers
+  - Score Range (min-max) with gap calculation
+
+**Implementation**: Located in `frontend/components/AnalysisResults.tsx`, extracts score data from `results.comparison_results.ranked_offers` and displays using framer-motion animated bars.
+
+### Net Value Analysis Table Visualizations
+
+The Net Value Analysis summary table includes horizontal bar chart visualizations:
+
+- **Per-Metric Bars**: Each table row (Gross Total, Tax Amount, Net Take-Home, CoL, Discretionary Income) has a visualization row below it
+- **Percentage-Based Comparison**: Bars show relative comparison as percentages of the maximum value
+- **Winner Highlighting**: Financial winner's column highlighted with green gradient
+- **Animated Load**: Smooth width animations with staggered delays
+
+**Implementation**: Similar to Detailed Metrics Comparison, extracts numeric values from currency strings and creates proportional bars.
+
+### Detailed Metrics Comparison Table Visualizations
+
+The Detailed Metrics Comparison table in Multi-Dimensional Analysis includes:
+
+- **Metric Row Visualizations**: Horizontal bar charts below each metric row (Base Salary, Equity, Bonus, Total Comp, Net Pay, Expenses, Net Savings)
+- **Color Coding**:
+  - Green/Blue gradients for positive metrics (compensation, savings)
+  - Red/Orange gradients for expenses
+  - Neutral for descriptive metrics (Job Level - no visualization)
+- **Winner Badges**: Key metrics (Total Comp, Net Pay, Net Savings) show "Winner" badge for the highest value
+- **Percentage Indicators**: Each bar shows percentage relative to maximum value
+
+**Implementation**: Parses currency values, calculates max for normalization, creates animated bars using motion.div with consistent styling.
+
+### Visual Design Principles
+
+- **Consistency**: All table visualizations use similar styling (h-2.5 bars, percentage indicators, smooth animations)
+- **Color Semantics**: Green for winners/positive, red/orange for expenses, neutral for descriptive
+- **Animation**: Staggered delays for visual appeal and smooth loading experience
+- **Responsiveness**: Grid layouts adapt to screen size, tables scroll horizontally on mobile

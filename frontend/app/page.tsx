@@ -223,7 +223,7 @@ export default function OfferComparePage() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white via-cyan-100 to-blue-200">
-                  OfferCompare Pro
+                  BenchMarked
                 </h1>
                 <p className="text-xs text-slate-400 font-medium tracking-wider">INTELLIGENT CAREER ANALYSIS</p>
               </div>

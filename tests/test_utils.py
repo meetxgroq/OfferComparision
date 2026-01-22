@@ -1,5 +1,5 @@
 """
-OfferCompare Pro - Utility Functions Tests
+BenchMarked - Utility Functions Tests
 Comprehensive test coverage for all utility modules
 """
 

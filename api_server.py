@@ -66,7 +66,7 @@ class AnalyzeResponse(BaseModel):
     offers: List[Dict[str, Any]]
 
 
-app = FastAPI(title="OfferCompare Pro API", version="1.0.0")
+app = FastAPI(title="BenchMarked API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,

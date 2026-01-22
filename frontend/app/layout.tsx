@@ -2,7 +2,7 @@ import './globals.css'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'OfferCompare Pro',
+  title: 'BenchMarked',
   description: 'AI-powered job offer analysis and decision support',
 }
 

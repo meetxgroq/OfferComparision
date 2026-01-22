@@ -1,5 +1,5 @@
 """
-OfferCompare Pro - Pytest Configuration and Shared Fixtures
+BenchMarked - Pytest Configuration and Shared Fixtures
 Shared test fixtures and configuration for all test modules
 """
 

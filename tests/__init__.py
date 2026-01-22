@@ -1,2 +1,2 @@
-# OfferCompare Pro - Test Suite
+# BenchMarked - Test Suite
 # Comprehensive unit tests for all components 

@@ -1,5 +1,5 @@
 """
-OfferCompare Pro - Integration Tests
+BenchMarked - Integration Tests
 End-to-end testing of the complete flow and system integration
 """
 

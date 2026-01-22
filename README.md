@@ -1,4 +1,4 @@
-# OfferCompare Pro - Intelligent Job Offer Analysis Platform
+# BenchMarked - Intelligent Job Offer Analysis Platform
 
 <div align="center">
 
@@ -15,7 +15,7 @@
 
 ## 🎯 Overview
 
-OfferCompare Pro is an intelligent job offer analysis platform that helps professionals make data-driven career decisions. It compares compensation packages, work-life balance metrics, and growth opportunities with real-time tax-adjusted net pay analysis and AI-powered recommendations.
+BenchMarked is an intelligent job offer analysis platform that helps professionals make data-driven career decisions. It compares compensation packages, work-life balance metrics, and growth opportunities with real-time tax-adjusted net pay analysis and AI-powered recommendations.
 
 ### ✨ Key Features
 
@@ -26,6 +26,7 @@ OfferCompare Pro is an intelligent job offer analysis platform that helps profes
 - **🎯 Personalized Scoring** - Weighted evaluation based on your specific priorities
 - **🤖 Multi-AI Analysis** - Insights powered by Google Gemini, OpenAI, or Anthropic
 - **💻 Interactive Dashboard** - Modern Next.js interface with real-time visualizations
+- **📊 Enhanced Visualizations** - Score comparison bars, animated metric charts, and interactive data representations
 - **📋 Actionable Reports** - Strategic decision frameworks and negotiation tips
 
 ## 🚀 Quick Start
@@ -107,6 +108,13 @@ flowchart TD
 - **utils/call_llm.py**: Multi-provider LLM interface with smart retry logic and model cascade (Gemini, OpenAI, Claude).
 - **nodes.py**: 7+ processing nodes for data enrichment and analysis with parallel async execution.
 - **api_server.py**: FastAPI backend serving the analysis results.
+
+### Visualization Features
+- **Executive Summary Score Visualization**: Interactive score comparison bars showing each offer's total score with statistics (min, max, average)
+- **Net Value Analysis Table**: Horizontal bar chart visualizations for each financial metric with winner highlighting
+- **Detailed Metrics Comparison**: Animated bar charts below each metric row for easy visual comparison across offers
+- **Percentile Visualization**: Color-coded progress bars showing market position for base salary and total compensation
+- **Multi-Dimensional Analysis**: Radar charts, stacked bar charts, and comprehensive comparison tables
 
 ## 🛠️ Development
 

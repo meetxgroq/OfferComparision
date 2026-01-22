@@ -1,5 +1,5 @@
 """
-OfferCompare Pro - Node Tests
+BenchMarked - Node Tests
 Comprehensive test coverage for all PocketFlow nodes
 """
 
