@@ -17,6 +17,7 @@ from utils.company_db import get_company_data, enrich_company_data
 import json
 import asyncio
 import time
+from datetime import datetime
 
 class OfferCollectionNode(Node):
     """
@@ -170,7 +171,7 @@ class MarketResearchNode(AsyncParallelBatchNode):
         Uses async I/O for parallel processing.
         """
         start_time = time.time()
-        timestamp = time.strftime("%H:%M:%S.%f", time.localtime(start_time))[:-3]
+        timestamp = datetime.fromtimestamp(start_time).strftime("%H:%M:%S.%f")[:-3]
         print(f"\n[DEBUG] MarketResearch for {research_item['company']} started at {timestamp}")
         print(f"Conducting market research for {research_item['company']}...")
         
@@ -190,7 +191,7 @@ class MarketResearchNode(AsyncParallelBatchNode):
             
             end_time = time.time()
             duration = end_time - start_time
-            end_timestamp = time.strftime("%H:%M:%S.%f", time.localtime(end_time))[:-3]
+            end_timestamp = datetime.fromtimestamp(end_time).strftime("%H:%M:%S.%f")[:-3]
             print(f"[DEBUG] MarketResearch for {research_item['company']} completed at {end_timestamp}, duration: {duration:.2f}s")
             
             return {
@@ -397,7 +398,7 @@ class MarketBenchmarkingNode(AsyncParallelBatchNode):
     async def exec_async(self, benchmark_item):
         """Perform market benchmarking for a single offer using async calls."""
         start_time = time.time()
-        timestamp = time.strftime("%H:%M:%S.%f", time.localtime(start_time))[:-3]
+        timestamp = datetime.fromtimestamp(start_time).strftime("%H:%M:%S.%f")[:-3]
         print(f"\n[DEBUG] MarketBenchmarking for {benchmark_item['company']} started at {timestamp}")
         print(f"Performing market benchmarking analysis for {benchmark_item['company']} {benchmark_item['position']}...")
         
@@ -452,7 +453,7 @@ class MarketBenchmarkingNode(AsyncParallelBatchNode):
             
             end_time = time.time()
             duration = end_time - start_time
-            end_timestamp = time.strftime("%H:%M:%S.%f", time.localtime(end_time))[:-3]
+            end_timestamp = datetime.fromtimestamp(end_time).strftime("%H:%M:%S.%f")[:-3]
             print(f"[DEBUG] MarketBenchmarking for {benchmark_item['company']} completed at {end_timestamp}, duration: {duration:.2f}s")
             
             # Include alias keys expected by tests
@@ -572,7 +573,7 @@ class AIAnalysisNode(AsyncNode):
     async def exec_async(self, prep_data):
         """Generate comprehensive AI analysis using async LLM calls."""
         start_time = time.time()
-        timestamp = time.strftime("%H:%M:%S.%f", time.localtime(start_time))[:-3]
+        timestamp = datetime.fromtimestamp(start_time).strftime("%H:%M:%S.%f")[:-3]
         print(f"\n[DEBUG] AIAnalysis started at {timestamp}")
         
         offers = prep_data["offers"]
@@ -598,7 +599,7 @@ class AIAnalysisNode(AsyncNode):
         
         # Generate specific recommendations for each offer (async) - run in parallel
         rec_start_time = time.time()
-        rec_timestamp = time.strftime("%H:%M:%S.%f", time.localtime(rec_start_time))[:-3]
+        rec_timestamp = datetime.fromtimestamp(rec_start_time).strftime("%H:%M:%S.%f")[:-3]
         print(f"[DEBUG] Generating {len(offers)} recommendations in parallel, started at {rec_timestamp}")
         
         recommendation_tasks = [
@@ -609,7 +610,7 @@ class AIAnalysisNode(AsyncNode):
         
         rec_end_time = time.time()
         rec_duration = rec_end_time - rec_start_time
-        rec_end_timestamp = time.strftime("%H:%M:%S.%f", time.localtime(rec_end_time))[:-3]
+        rec_end_timestamp = datetime.fromtimestamp(rec_end_time).strftime("%H:%M:%S.%f")[:-3]
         print(f"[DEBUG] Recommendations generation completed at {rec_end_timestamp}, duration: {rec_duration:.2f}s")
         
         offer_recommendations = [
@@ -629,7 +630,7 @@ class AIAnalysisNode(AsyncNode):
         
         end_time = time.time()
         duration = end_time - start_time
-        end_timestamp = time.strftime("%H:%M:%S.%f", time.localtime(end_time))[:-3]
+        end_timestamp = datetime.fromtimestamp(end_time).strftime("%H:%M:%S.%f")[:-3]
         print(f"[DEBUG] AIAnalysis completed at {end_timestamp}, total duration: {duration:.2f}s")
         
         return {
@@ -1251,7 +1252,7 @@ class QuickMarketAnalysisNode(AsyncParallelBatchNode):
     async def exec_async(self, market_item):
         """Quick market analysis using cached data and fast lookups."""
         start_time = time.time()
-        timestamp = time.strftime("%H:%M:%S.%f", time.localtime(start_time))[:-3]
+        timestamp = datetime.fromtimestamp(start_time).strftime("%H:%M:%S.%f")[:-3]
         print(f"\n[DEBUG] QuickMarketAnalysis for {market_item['company']} started at {timestamp}")
         
         # Use cached company data (fast, no API calls)
@@ -1305,7 +1306,7 @@ class QuickMarketAnalysisNode(AsyncParallelBatchNode):
         
         end_time = time.time()
         duration = end_time - start_time
-        end_timestamp = time.strftime("%H:%M:%S.%f", time.localtime(end_time))[:-3]
+        end_timestamp = datetime.fromtimestamp(end_time).strftime("%H:%M:%S.%f")[:-3]
         print(f"[DEBUG] QuickMarketAnalysis for {market_item['company']} completed at {end_timestamp}, duration: {duration:.2f}s")
         
         return {
@@ -1369,7 +1370,7 @@ class QuickAIAnalysisNode(AsyncNode):
     async def exec_async(self, prep_data):
         """Generate comprehensive analysis with single LLM call."""
         start_time = time.time()
-        timestamp = time.strftime("%H:%M:%S.%f", time.localtime(start_time))[:-3]
+        timestamp = datetime.fromtimestamp(start_time).strftime("%H:%M:%S.%f")[:-3]
         print(f"\n[DEBUG] QuickAIAnalysis started at {timestamp}")
         print("Generating quick AI-powered analysis and recommendations...")
         
@@ -1474,7 +1475,7 @@ class QuickAIAnalysisNode(AsyncNode):
             
             end_time = time.time()
             duration = end_time - start_time
-            end_timestamp = time.strftime("%H:%M:%S.%f", time.localtime(end_time))[:-3]
+            end_timestamp = datetime.fromtimestamp(end_time).strftime("%H:%M:%S.%f")[:-3]
             print(f"[DEBUG] QuickAIAnalysis completed at {end_timestamp}, duration: {duration:.2f}s")
             
             return {
