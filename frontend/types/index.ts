@@ -63,6 +63,25 @@ export interface AnalysisResults {
       rank: number
       ai_recommendation?: string
     }>
+    verdict?: {
+      recommended_company: string
+      financial_superiority?: boolean
+      reasoning?: string[]
+      career_growth_considerations?: string
+    }
+    negotiation_options?: Array<{
+      id: string
+      title: string
+      difficulty: string
+      description: string
+      script: string
+      difficulty_label?: string
+    }>
+    negotiation_opportunities?: string[]
+    lifestyle_comparison?: {
+      location_tradeoffs?: string
+      hidden_costs?: string
+    }
   }
   comparison_results: {
     ranked_offers: Array<{
