@@ -155,6 +155,29 @@ export default function OfferComparePage() {
         user_preferences: preferences
       })
       setAnalysisResults(response.data)
+
+      // Synchronize global offers state with AI-enriched data to ensure Job Cards match Snapshot
+      if (response.data.offers && response.data.offers.length > 0) {
+        setOffers(prevOffers => {
+          const updatedOffers = [...prevOffers];
+          response.data.offers.forEach((enrichedOffer: any) => {
+            const index = updatedOffers.findIndex(o => o.id === enrichedOffer.id);
+            if (index !== -1) {
+              // Merge AI-calculated fields (grades, tax, etc.) into the main offer object
+              updatedOffers[index] = {
+                ...updatedOffers[index],
+                ...enrichedOffer,
+                // Ensure specific grades are prioritized from AI results
+                wlb_grade: enrichedOffer.wlb_grade,
+                benefits_grade: enrichedOffer.benefits_grade,
+                growth_grade: enrichedOffer.growth_grade
+              };
+            }
+          });
+          return updatedOffers;
+        });
+      }
+
       // Scroll to results
       setTimeout(() => {
         document.getElementById('analysis-results')?.scrollIntoView({ behavior: 'smooth' })
@@ -370,7 +393,7 @@ export default function OfferComparePage() {
                       </span>
                     </label>
                   </div>
-                  
+
                   <button
                     onClick={runAnalysis}
                     disabled={selectedOffers.length < 2 || isAnalyzing}

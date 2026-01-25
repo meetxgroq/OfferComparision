@@ -144,6 +144,16 @@ class OfferCollectionNode(Node):
         except ValueError:
             return default if default is not None else 0
 
+def map_score_to_grade(score: float) -> str:
+    """Map a 1-10 or 0-100 score to a letter grade consistently."""
+    # Handle 0-100 normalization if needed
+    val = score if score <= 10 else score / 10
+    if val >= 9.0: return "A+"
+    if val >= 8.0: return "A"
+    if val >= 7.0: return "B+"
+    if val >= 6.0: return "B"
+    return "C"
+
 class MarketResearchNode(AsyncParallelBatchNode):
     """
     Gather comprehensive market intelligence for each company using AI agents.
@@ -231,17 +241,20 @@ class MarketResearchNode(AsyncParallelBatchNode):
                 offer["company_db_data"] = research_data["company_db_data"]
                 offer["enriched_data"] = research_data["enriched_data"]
                 
-                # Auto-populate grades if missing
+                # Auto-populate grades consistently
                 metrics = research_data["company_research"].get("metrics", {})
+                culture_metrics = research_data["company_db_data"].get("culture_metrics", {}) if research_data.get("company_db_data") else {}
                 
-                if not offer.get("benefits_grade") and metrics.get("benefits_score", {}).get("grade"):
-                     offer["benefits_grade"] = metrics["benefits_score"]["grade"]
-                     
-                if not offer.get("wlb_grade") and metrics.get("wlb_score", {}).get("grade"):
-                     offer["wlb_grade"] = metrics["wlb_score"]["grade"]
-                     
-                if not offer.get("growth_grade") and metrics.get("growth_score", {}).get("grade"):
-                     offer["growth_grade"] = metrics["growth_score"]["grade"]
+                wlb_score = culture_metrics.get("work_life_balance", metrics.get("wlb_score", {}).get("score", 7.0))
+                growth_score = culture_metrics.get("career_growth", metrics.get("growth_score", {}).get("score", 7.0))
+                benefits_score = culture_metrics.get("benefits_quality", metrics.get("benefits_score", {}).get("score", 7.0))
+                
+                offer["wlb_score"] = wlb_score
+                offer["growth_score"] = growth_score
+                
+                offer["wlb_grade"] = map_score_to_grade(wlb_score)
+                offer["growth_grade"] = map_score_to_grade(growth_score)
+                offer["benefits_grade"] = map_score_to_grade(benefits_score)
         
         print(f"Market research completed for {len(exec_res_list)} companies")
         return "default"
@@ -316,6 +329,7 @@ class TaxCalculationNode(BatchNode):
             if offer["id"] in analysis_lookup:
                 offer["net_pay_analysis"] = analysis_lookup[offer["id"]]
                 offer["estimated_net_pay"] = analysis_lookup[offer["id"]]["estimated_net_pay"]
+                offer["estimated_tax"] = analysis_lookup[offer["id"]]["estimated_tax_amount"]
         
         print("Tax calculations completed")
         return "default"
@@ -1082,7 +1096,8 @@ class QuickVisualizationNode(Node):
                     "offer_id": r.get("offer_id"),
                     "company": r.get("company"),
                     "total_score": r.get("total_score"),
-                    "rank": r.get("rank")
+                    "rank": r.get("rank"),
+                    "offer_data": r.get("offer_data")  # Ensure full data is passed
                 }
                 for r in ranked_offers
             ]
@@ -1217,6 +1232,7 @@ class QuickFinancialAnalysisNode(BatchNode):
                 offer["expense_analysis"] = res["expense_analysis"]
                 offer["estimated_annual_expenses"] = res["expense_analysis"]["estimated_annual_expenses"]
                 offer["net_savings"] = res["net_savings"]
+                offer["estimated_tax"] = res["net_pay_analysis"]["estimated_tax_amount"]
         
         print(f"Quick financial analysis completed for {len(exec_res_list)} offers")
         return "default"
@@ -1334,14 +1350,24 @@ class QuickMarketAnalysisNode(AsyncParallelBatchNode):
                     # Extract metrics for compatibility
                     culture_metrics = market_data["company_db_data"].get("culture_metrics", {})
                     if culture_metrics:
-                        offer["wlb_score"] = culture_metrics.get("work_life_balance", 7.0)
-                        offer["growth_score"] = culture_metrics.get("career_growth", 7.5)
+                        wlb_score = culture_metrics.get("work_life_balance", 7.0)
+                        growth_score = culture_metrics.get("career_growth", 7.5)
+                        offer["wlb_score"] = wlb_score
+                        offer["growth_score"] = growth_score
+                        
+                        # Use centralized grade mapping
+                        offer["wlb_grade"] = map_score_to_grade(wlb_score)
+                        offer["growth_grade"] = map_score_to_grade(growth_score)
+                        
                         offer["benefits_grade"] = "A" if market_data["company_db_data"].get("glassdoor_rating", 0) >= 4.0 else "B"
                 
                 # Add market data
                 offer["market_analysis"] = market_data["base_percentile"]
                 offer["total_comp_analysis"] = market_data["total_percentile"]
                 offer["compensation_insights"] = market_data["compensation_insights"]
+                # Direct access fields for UI
+                offer["market_percentile"] = market_data["total_percentile"].get("market_percentile", 50)
+                offer["market_median"] = market_data["total_percentile"].get("market_range", {}).get("median", 0)
         
         print(f"Quick market analysis completed for {len(exec_res_list)} offers")
         return "default"
@@ -1513,6 +1539,7 @@ class QuickAIAnalysisNode(AsyncNode):
                     "company": offer.get("company", "Unknown"),
                     "gross_total": gross_total,
                     "estimated_tax": estimated_tax,
+                    "estimated_tax_amount": estimated_tax,  # Add explicit amount field
                     "net_annual": net_pay,
                     "annual_col": annual_expenses,
                     "discretionary_income": discretionary_income,
@@ -1548,42 +1575,49 @@ class QuickAIAnalysisNode(AsyncNode):
                 "Review full analysis for detailed insights"
             ]
             
-            # Generate structured negotiation options
+            # Generate structured negotiation options for all companies
             negotiation_options = []
-            if len(offers) >= 2:
-                max_gross = max(o.get('total_compensation', 0) for o in offers)
-                winner_gross = winner_offer.get('total_compensation', 0) if winner_offer else 0
-                gap = max_gross - winner_gross
+            for offer in offers:
+                company_name = offer.get("company", "Unknown")
+                max_total = max(o.get('total_compensation', 0) for o in offers)
+                curr_total = offer.get('total_compensation', 0)
+                gap = max_total - curr_total if max_total > curr_total else 5000 # Default gap if winner
                 
-                if gap > 0:
-                    negotiation_options.append({
-                        "id": "option_a",
-                        "title": "Sign-on bonus",
-                        "description": f"${gap:,.0f} one-time · Adds ~${int(gap * 0.7):,} after taxes",
-                        "difficulty": "worth_asking",
-                        "difficulty_label": "Worth asking",
-                        "expected_value_impact": int(gap * 0.7),
-                        "script": f"I'm genuinely excited about this role and the impact I could make on the team. To help bridge the gap with my other opportunities, I'd appreciate consideration for a ${gap:,.0f} sign-on bonus. This would help offset the opportunity cost and demonstrate the company's commitment to my success."
-                    })
-                
+                # Add 3 universal options per company
                 negotiation_options.append({
-                    "id": "option_b",
-                    "title": "Higher salary",
-                    "description": f"+${int(gap * 0.3):,}/year · Adds ~${int(gap * 0.3 * 4):,} over 4 years",
-                    "difficulty": "likely_achievable",
-                    "difficulty_label": "Likely achievable",
-                    "expected_value_impact": int(gap * 0.3 * 4),
-                    "script": f"I'm genuinely excited about this role and the impact I could make on the team. Given my experience and the value I'll bring, I'd like to discuss increasing the base salary to better align with market rates and my other opportunities."
+                    "id": f"opt_{offer['id']}_a",
+                    "company": company_name,
+                    "title": "Sign-on bonus",
+                    "description": f"Targeting ${int(gap):,.0f} one-time sign-on bonus.",
+                    "financial_impact": f"+${int(gap/1000)}k",
+                    "difficulty": "worth_asking",
+                    "difficulty_label": "Worth asking",
+                    "expected_value_impact": int(gap),
+                    "script": f"I'm genuinely excited about joining {company_name}. To help bridge the gap with my other current opportunities, I'd appreciate consideration for a sign-on bonus. This would help demonstrate the company's commitment to my transition."
                 })
                 
                 negotiation_options.append({
-                    "id": "option_c",
-                    "title": "Stock refreshers",
-                    "description": "Inquire about annual equity refreshers · Adds ~$20K-40K/year",
+                    "id": f"opt_{offer['id']}_b",
+                    "company": company_name,
+                    "title": "Base salary increase",
+                    "description": f"Targeting +5-10% increase in base salary.",
+                    "financial_impact": "+$15k",
+                    "difficulty": "likely_achievable",
+                    "difficulty_label": "Likely achievable",
+                    "expected_value_impact": 15000,
+                    "script": f"Thank you for the offer at {company_name}. Given my specific expertise and the market data I've reviewed for similar roles, I'd like to discuss if there's flexibility to increase the base salary to better align with the value I'll be bringing to the team."
+                })
+                
+                negotiation_options.append({
+                    "id": f"opt_{offer['id']}_c",
+                    "company": company_name,
+                    "title": "Equity refresher eligibility",
+                    "description": "Confirm timeline for subsequent grants.",
+                    "financial_impact": "Variable",
                     "difficulty": "worth_asking",
                     "difficulty_label": "Worth asking",
-                    "expected_value_impact": 30000,
-                    "script": "I'm genuinely excited about this role and the impact I could make on the team. I'd like to understand the company's approach to annual stock refreshers and equity growth potential, as this is an important factor in my long-term compensation planning."
+                    "expected_value_impact": 0,
+                    "script": f"I'm very interested in the equity component of the {company_name} package. Could you clarify the policy on annual equity refreshers and how those grants are Typically structured for this level? Understanding the long-term growth potential is key for me."
                 })
             
             # Keep simple list for backward compatibility
@@ -1623,8 +1657,8 @@ class QuickAIAnalysisNode(AsyncNode):
                     "winner_discretionary_income": winner_discretionary
                 },
                 "lifestyle_comparison": {
-                    "location_tradeoffs": f"Compare locations: {', '.join([o.get('location', 'Unknown') for o in offers])}. Consider tax implications, cost of living, and quality of life factors.",
-                    "hidden_costs": "Consider additional costs such as transportation, childcare, and local taxes when evaluating offers."
+                    "location_tradeoffs": f"- Compare locations: {', '.join([o.get('location', 'Unknown') for o in offers])}\n- Consider tax implications and local state income tax brackets\n- Analyze cost of living deltas for housing and utilities\n- Evaluate quality of life and proximity to networking hubs",
+                    "hidden_costs": "- Transportation and commute expenses\n- Local and city-level taxes or surcharges\n- Differential in utility and grocery costs"
                 },
                 "summary_table": {
                     "headers": table_headers,
@@ -1633,6 +1667,8 @@ class QuickAIAnalysisNode(AsyncNode):
                 "verdict": {
                     "recommended_offer_id": winner_id,
                     "recommended_company": winner_offer.get("company", "Unknown") if winner_offer else "Unknown",
+                    "is_tie": False,
+                    "summary_reasoning": f"{winner_offer.get('company', 'Unknown')} provided the best overall financial value with ${winner_discretionary:,.0f} in discretionary income.",
                     "financial_superiority": winner_offer.get("company", "Unknown") if winner_offer else "Unknown",
                     "reasoning": verdict_reasoning,
                     "career_growth_considerations": "Evaluate career growth opportunities, company culture, and long-term trajectory at each organization."
@@ -1677,9 +1713,15 @@ class QuickAIAnalysisNode(AsyncNode):
                     if offer_id in offer_lookup:
                         ranked_offer["offer_data"] = offer_lookup[offer_id]
                 
-                # Add AI recommendation
+                # Add AI recommendation and market data
                 if offer_id in rec_lookup:
                     ranked_offer["ai_recommendation"] = rec_lookup[offer_id]
+                
+                # Add market insights for benchmarking UI
+                if offer_id in offer_lookup:
+                    offer_obj = offer_lookup[offer_id]
+                    ranked_offer["market_percentile"] = offer_obj.get("market_percentile", 50)
+                    ranked_offer["market_median"] = offer_obj.get("market_median", 0)
         
         # Store new Net Value Analysis fields directly in shared state
         shared["net_value_analysis"] = exec_res.get("net_value_analysis", {})
@@ -1722,42 +1764,45 @@ Offer {i}:
 - Bonus: ${offer.get('bonus', 0):,}
 - Gross Total (Salary + Equity + Bonus): ${offer.get('total_compensation', 0):,}
 - Estimated Tax Rate: {tax_rate_pct}
+- Estimated Tax Amount: ${offer.get('net_pay_analysis', {}).get('estimated_tax_amount', 0):,}
 - Estimated Net Pay (After Tax): ${net_pay:,}
 - Monthly Cost of Living: ${annual_expenses / 12:,.0f} (Annual: ${annual_expenses:,})
 - Net Savings (Discretionary Income): ${net_savings:,}
 - Market Percentile: {offer.get('market_analysis', {}).get('market_percentile', 'N/A')}
 - WLB Score: {offer.get('wlb_score', 'N/A')}
 - Growth Score: {offer.get('growth_score', 'N/A')}
+- Benefits Grade: {offer.get('benefits_grade', 'N/A')}
 """
         
-        prompt += f"""
+        prompt += """
 
 YOUR TASKS - Provide a comprehensive JSON response:
 
 1. Net Value Analysis: Calculate and compare discretionary income (Net Pay - Annual CoL) for each offer. Identify the financial winner.
 
-2. Lifestyle Comparison: Analyze location trade-offs, hidden costs, and quality of life factors for each location.
+2. Lifestyle Comparison: Analyze location trade-offs, hidden costs, and quality of life factors for each location. Use short, punchy bullet points (max 5 per section) instead of paragraphs.
 
 3. Summary Table: Create a side-by-side comparison table with key financial metrics.
 
 4. Verdict: Provide a clear recommendation with 4-5 bullet points of reasoning, considering both financial superiority and career growth.
 
-5. Negotiation Opportunities: Provide 3-5 structured negotiation options for the recommended offer. Each option should include:
+5. Negotiation Strategy: Provide 3-5 structured negotiation options for EACH company being compared. Ensure these are tailored to the specific offer terms and location. Each option should include:
    - A clear title (e.g., "Higher salary", "Signing bonus", "Accelerated vesting")
    - Description with expected value impact (e.g., "+$48K/year · Adds ~$133K over 4 years")
-   - Difficulty level: "likely_achievable", "worth_asking", or "ambitious_ask"
+   - difficulty: "likely_achievable", "worth_asking", or "ambitious_ask"
    - Expected value impact in dollars
    - A personalized negotiation script (2-3 paragraphs) that the user can copy and use
+   - MANDATORY: Include the "company" name in each negotiation option.
 
 6. Reality Checks: Identify potential red flags and important considerations for each offer. Include:
    - Red flags: Critical warnings or concerns (e.g., "Equity may be diluted in future funding rounds", "High cost of living may reduce purchasing power")
    - Considerations: Important factors to keep in mind (e.g., "Consider vesting schedule and cliff period", "Evaluate company growth trajectory")
 
 Provide a JSON response with this EXACT structure:
-{{
-    "net_value_analysis": {{
+{
+    "net_value_analysis": {
         "offers": [
-            {{
+            {
                 "offer_id": "offer_1",
                 "company": "Company Name",
                 "gross_total": 275000,
@@ -1766,16 +1811,16 @@ Provide a JSON response with this EXACT structure:
                 "annual_col": 54000,
                 "discretionary_income": 149500,
                 "discretionary_income_delta": 14650
-            }}
+            }
         ],
         "winner": "offer_1",
         "winner_discretionary_income": 149500
-    }},
-    "lifestyle_comparison": {{
-        "location_tradeoffs": "Formatted markdown text comparing locations, highlighting upsides and downsides of each location (tax implications, cost of living, quality of life, networking opportunities, weather, etc.)",
-        "hidden_costs": "List of hidden costs to consider for these specific locations (e.g., higher gas prices, sales tax, childcare costs, traffic congestion, etc.)"
-    }},
-    "summary_table": {{
+    },
+    "lifestyle_comparison": {
+        "location_tradeoffs": "- Point 1: Benefits\n- Point 2: Drawbacks\n- Point 3: Networking",
+        "hidden_costs": "- Cost 1: Local taxes\n- Cost 2: Commute costs"
+    },
+    "summary_table": {
         "headers": ["Metric", "Company 1 (Location)", "Company 2 (Location)"],
         "rows": [
             ["Gross Total (Inc. Equity)", "$275,000", "$309,000"],
@@ -1784,52 +1829,45 @@ Provide a JSON response with this EXACT structure:
             ["Annual CoL", "$54,000", "$66,000"],
             ["Final Discretionary Income", "$149,500", "$134,850"]
         ]
-    }},
-    "verdict": {{
+    },
+    "verdict": {
         "recommended_offer_id": "offer_1",
         "recommended_company": "Company Name",
+        "is_tie": false,
+        "summary_reasoning": "Company Name offers the best balance of total compensation and work-life balance for your specific priorities.",
         "financial_superiority": "Company Name",
         "reasoning": [
-            "Point 1: Financial advantage explanation",
-            "Point 2: Tax/location benefit",
-            "Point 3: Work-life balance consideration",
-            "Point 4: Career growth or equity stability",
-            "Point 5: Long-term outlook"
+            "Tax Efficiency: Explaining why the location is better for taxes",
+            "Relocation: Breakdown of relocation benefits",
+            "Growth: Long-term career trajectory points"
         ],
-        "career_growth_considerations": "Brief analysis comparing career growth opportunities, networking potential, and long-term trajectory at each company"
-    }},
+        "career_growth_considerations": "Detailed analysis of career growth potential"
+    },
     "negotiation_options": [
-        {{
+        {
             "id": "option_a",
+            "company": "Company Name",
             "title": "Higher salary",
             "description": "+$48K/year · Adds ~$133K over 4 years",
+            "financial_impact": "+$48k",
             "difficulty": "likely_achievable",
             "difficulty_label": "Likely achievable",
             "expected_value_impact": 133000,
-            "script": "I'm genuinely excited about this role and the impact I could make on the team. The equity and base salary are compelling, but I want to be transparent about my decision-making. Given my experience and the value I'll bring, I'd like to discuss increasing the base salary to $X, which would better align with market rates and my other opportunities."
-        }},
-        {{
-            "id": "option_b",
-            "title": "Signing bonus",
-            "description": "$50K one-time · Adds ~$35K after taxes",
-            "difficulty": "worth_asking",
-            "difficulty_label": "Worth asking",
-            "expected_value_impact": 35000,
-            "script": "I'm genuinely excited about this role and the impact I could make on the team. To help bridge the gap with my other opportunities and recognize the risk I'm taking in joining at this stage, I'd appreciate consideration for a $X signing bonus. This would help offset the opportunity cost and demonstrate the company's commitment to my success."
-        }}
+            "script": "I'm genuinely excited about this role..."
+        }
     ],
     "negotiation_opportunities": ["Legacy field - use negotiation_options instead"],
     "comparison_summary": "Brief 2-3 sentence summary for executive summary",
     "ranked_offers": [
-        {{
+        {
             "offer_id": "offer_1",
             "company": "Company Name",
             "position": "Position",
             "total_score": 85.5,
             "rank": 1
-        }}
+        }
     ]
-}}
+}
 
 Be objective, highlight hidden costs, and provide actionable insights. Focus on real financial impact and quality of life.
 """

@@ -53,6 +53,7 @@ export interface UserProfile {
 export interface AnalysisResults {
   executive_summary: string
   final_report: {
+    report_type?: string
     detailed_analysis: string
     decision_framework: string
     offer_rankings: Array<{
@@ -64,18 +65,34 @@ export interface AnalysisResults {
       ai_recommendation?: string
     }>
     verdict?: {
-      recommended_company: string
+      recommended_company: string | null
+      is_tie?: boolean
+      summary_reasoning?: string
       financial_superiority?: boolean
       reasoning?: string[]
       career_growth_considerations?: string
     }
+    net_value_analysis?: {
+      offers: Array<{
+        offer_id: string
+        company: string
+        gross_total: number
+        estimated_tax: number
+        net_take_home: number
+        annual_col: number
+        final_discretionary_income: number
+      }>
+      winner: string
+    }
     negotiation_options?: Array<{
       id: string
+      company?: string
       title: string
       difficulty: string
       description: string
       script: string
       difficulty_label?: string
+      financial_impact?: string
     }>
     negotiation_opportunities?: string[]
     lifestyle_comparison?: {
@@ -95,6 +112,9 @@ export interface AnalysisResults {
       offer_data: any
       rank: number
       score_gap?: number
+      market_percentile?: number
+      market_median?: number
+      ai_recommendation?: any
     }>
     top_offer?: any
     comparison_summary: string
