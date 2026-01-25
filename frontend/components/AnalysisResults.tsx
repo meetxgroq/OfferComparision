@@ -67,6 +67,41 @@ export default function AnalysisResults({ results }: AnalysisResultsProps) {
   const [showDetailed, setShowDetailed] = useState(false)
   const [copiedScriptId, setCopiedScriptId] = useState<string | null>(null)
 
+  // Helper to format content for ReactMarkdown defensively
+  const formatMarkdownContent = (content: any): string => {
+    if (!content) return ''
+    if (typeof content === 'string') return content
+
+    if (Array.isArray(content)) {
+      return content.map(item => {
+        if (typeof item === 'object') return formatMarkdownContent(item)
+        return `- ${item}`
+      }).join('\n')
+    }
+
+    if (typeof content === 'object') {
+      try {
+        // Handle common keys
+        if (content.points && Array.isArray(content.points)) return formatMarkdownContent(content.points)
+        if (content.items && Array.isArray(content.items)) return formatMarkdownContent(content.items)
+
+        // Convert object to nested bullet points
+        return Object.entries(content).map(([key, value]) => {
+          if (Array.isArray(value)) {
+            return `- **${key}**\n${value.map(v => `  - ${v}`).join('\n')}`
+          }
+          if (typeof value === 'object') {
+            return `- **${key}**\n${formatMarkdownContent(value).split('\n').map(l => `  ${l}`).join('\n')}`
+          }
+          return `- **${key}**: ${value}`
+        }).join('\n')
+      } catch (e) {
+        return String(content)
+      }
+    }
+    return String(content)
+  }
+
   const tabs = [
     { id: 'ai', label: 'AI Recommendations', icon: SparklesIcon },
     { id: 'charts', label: 'Multi-Dimensional Analysis', icon: ChartBarIcon },
@@ -622,9 +657,7 @@ export default function AnalysisResults({ results }: AnalysisResultsProps) {
                           strong: ({ children }) => <span className="text-white font-bold">{children}</span>,
                         }}
                       >
-                        {typeof results.final_report.lifestyle_comparison.location_tradeoffs === 'string'
-                          ? results.final_report.lifestyle_comparison.location_tradeoffs
-                          : String(results.final_report.lifestyle_comparison.location_tradeoffs || '')}
+                        {formatMarkdownContent(results.final_report.lifestyle_comparison.location_tradeoffs)}
                       </ReactMarkdown>
                     </div>
                   </div>
@@ -649,9 +682,7 @@ export default function AnalysisResults({ results }: AnalysisResultsProps) {
                           strong: ({ children }) => <span className="text-white font-bold">{children}</span>,
                         }}
                       >
-                        {typeof results.final_report.lifestyle_comparison.hidden_costs === 'string'
-                          ? results.final_report.lifestyle_comparison.hidden_costs
-                          : String(results.final_report.lifestyle_comparison.hidden_costs || '')}
+                        {formatMarkdownContent(results.final_report.lifestyle_comparison.hidden_costs)}
                       </ReactMarkdown>
                     </div>
                   </div>

@@ -18,6 +18,7 @@ import json
 import asyncio
 import time
 from datetime import datetime
+from typing import Any, List, Dict, Optional, Union
 
 class OfferCollectionNode(Node):
     """
@@ -153,6 +154,84 @@ def map_score_to_grade(score: float) -> str:
     if val >= 7.0: return "B+"
     if val >= 6.0: return "B"
     return "C"
+
+def ensure_markdown_string(data: Any, offers: List[Dict[str, Any]] = None) -> str:
+    """Ensure data is a clean markdown string (e.g. from AI) with hyper-robust company mapping."""
+    if not data:
+        return ""
+    
+    # Build a hyper-robust mapping of any possible ID variation to Company Name
+    id_map = {}
+    name_to_id = {} # To handle AI returning company names as keys but mixed case
+    
+    if offers:
+        for o in offers:
+            company = o.get("company", "Unknown")
+            ids_to_try = ["id", "offer_id", "oid", "OfferID"]
+            
+            for id_key in ids_to_try:
+                raw_id = o.get(id_key)
+                if raw_id:
+                    oid = str(raw_id).lower().strip()
+                    id_map[oid] = company
+                    
+                    # Extract number for "1", "2" matching
+                    import re
+                    nums = re.findall(r'\d+', oid)
+                    if nums:
+                        num = nums[0]
+                        id_map[num] = company
+                        id_map[f"offer {num}"] = company
+                        id_map[f"offer-{num}"] = company
+                        id_map[f"offer{num}"] = company
+                        id_map[f"offer_{num}"] = company
+            
+            # Also map the company name to itself (case-insensitive)
+            id_map[company.lower().strip()] = company
+
+    if isinstance(data, str):
+        return data.strip()
+    
+    if isinstance(data, list):
+        return "\n".join([f"- {str(item).strip()}" for item in data if item])
+    
+    if isinstance(data, dict):
+        lines = []
+        # Sort by numerical order if keys are numeric or contain numbers
+        def sort_key(k):
+            import re
+            nums = re.findall(r'\d+', str(k))
+            return int(nums[0]) if nums else 0
+            
+        try:
+            sorted_keys = sorted(data.keys(), key=sort_key)
+        except:
+            sorted_keys = sorted(data.keys())
+
+        for k in sorted_keys:
+            v = data[k]
+            # Try to find the best match for the header
+            lookup_key = str(k).lower().strip()
+            display_header = id_map.get(lookup_key, k)
+            
+            # If still just a number, check if it's a 1-based index
+            if lookup_key.isdigit() and lookup_key not in id_map:
+                # Handle cases like AI returning "1", "2" instead of "offer_1"
+                pass 
+
+            if isinstance(v, list):
+                lines.append(f"- **{display_header}**")
+                for item in v:
+                    lines.append(f"  - {str(item).strip()}")
+            elif isinstance(v, dict):
+                lines.append(f"- **{display_header}**")
+                for sk, sv in v.items():
+                    lines.append(f"  - **{sk}**: {str(sv).strip()}")
+            else:
+                lines.append(f"- **{display_header}**: {str(v).strip()}")
+        return "\n".join(lines)
+        
+    return str(data)
 
 class MarketResearchNode(AsyncParallelBatchNode):
     """
@@ -1435,7 +1514,11 @@ class QuickAIAnalysisNode(AsyncNode):
             
             # Extract new Net Value Analysis structure from LLM response
             net_value_analysis = analysis_data.get("net_value_analysis", {})
-            lifestyle_comparison = analysis_data.get("lifestyle_comparison", {})
+            raw_lifestyle = analysis_data.get("lifestyle_comparison", {})
+            lifestyle_comparison = {
+                "location_tradeoffs": ensure_markdown_string(raw_lifestyle.get("location_tradeoffs", ""), offers),
+                "hidden_costs": ensure_markdown_string(raw_lifestyle.get("hidden_costs", ""), offers)
+            }
             summary_table = analysis_data.get("summary_table", {})
             verdict = analysis_data.get("verdict", {})
             reality_checks = analysis_data.get("reality_checks", {})
