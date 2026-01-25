@@ -214,10 +214,17 @@ def ensure_markdown_string(data: Any, offers: List[Dict[str, Any]] = None) -> st
             lookup_key = str(k).lower().strip()
             display_header = id_map.get(lookup_key, k)
             
-            # If still just a number, check if it's a 1-based index
-            if lookup_key.isdigit() and lookup_key not in id_map:
-                # Handle cases like AI returning "1", "2" instead of "offer_1"
-                pass 
+            # Fallback: If still "offer_1" etc., try 1-based indexing into offers list
+            if display_header == k and offers:
+                import re
+                nums = re.findall(r'\d+', lookup_key)
+                if nums:
+                    try:
+                        idx = int(nums[0]) - 1
+                        if 0 <= idx < len(offers):
+                            display_header = offers[idx].get("company", display_header)
+                    except ValueError:
+                        pass
 
             if isinstance(v, list):
                 lines.append(f"- **{display_header}**")
