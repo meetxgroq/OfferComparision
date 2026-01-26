@@ -20,6 +20,41 @@ import time
 from datetime import datetime
 from typing import Any, List, Dict, Optional, Union
 
+# Helper function for generating personalized career growth content
+def _generate_growth_content(offer: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Generate personalized career growth content based on existing growth score.
+    
+    Args:
+        offer: Offer dict with growth_score field (0-10 scale)
+    
+    Returns:
+        Dict with growth_description and growth_points fields
+    """
+    growth_score = offer.get("growth_score", 7.0)
+    company = offer.get("company", "the company")
+    
+    if growth_score >= 9.0:
+        description = f"Exceptional career growth trajectory at {company} with rapid advancement opportunities and cutting-edge skill development."
+        points = ["Fast-track leadership path", "Cutting-edge skills development", "High-visibility projects", "Executive mentorship"]
+    elif growth_score >= 8.0:
+        description = f"Strong long-term potential at {company} for skill acquisition, technical leadership, and career advancement."
+        points = ["Clear promotion path", "Technical leadership opportunities", "Continuous learning culture", "Cross-functional exposure"]
+    elif growth_score >= 7.0:
+        description = f"Solid growth opportunities at {company} with structured career development and defined advancement paths."
+        points = ["Defined career ladder", "Skill-building programs", "Mentorship available", "Internal mobility"]
+    elif growth_score >= 6.0:
+        description = f"Moderate growth potential at {company} with established development programs and standard progression."
+        points = ["Standard promotion cycles", "Training resources", "Limited mentorship", "Gradual progression"]
+    else:
+        description = f"Limited internal growth opportunities at {company}; consider external advancement strategies."
+        points = ["Slow promotion pace", "Flat organizational structure", "Few learning programs", "External opportunities recommended"]
+    
+    return {
+        "growth_description": description,
+        "growth_points": points
+    }
+
 class OfferCollectionNode(Node):
     """
     Collect and validate comprehensive offer data from user input.
@@ -298,8 +333,8 @@ class MarketResearchNode(AsyncParallelBatchNode):
                 "enriched_data": enriched_data
             }
         except Exception as e:
-            error_str = str(e)
-            if "429" in error_str or "Quota" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+            error_str = str(e).lower()
+            if any(k in error_str for k in ["429", "quota", "resource_exhausted", "exhausted", "limit"]):
                 print(f"[INFO] Quota hit in MarketResearch. Using mock data.")
                 return {
                     "offer_id": research_item["offer_id"],
@@ -577,8 +612,8 @@ class MarketBenchmarkingNode(AsyncParallelBatchNode):
                 "ai_analysis": ai_analysis
             }
         except Exception as e:
-            error_str = str(e)
-            if "429" in error_str or "Quota" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+            error_str = str(e).lower()
+            if any(k in error_str for k in ["429", "quota", "resource_exhausted", "exhausted", "limit"]):
                 print(f"[INFO] Quota hit in MarketBenchmarking. Using mock data.")
                 return {
                     "offer_id": benchmark_item["offer_id"],
@@ -712,9 +747,10 @@ class AIAnalysisNode(AsyncNode):
                 system_prompt="You are an expert career advisor and compensation analyst providing comprehensive job offer analysis."
             )
         except Exception as e:
-            error_str = str(e)
+            error_str = str(e).lower()
             print(f"[WARNING] Main AI Analysis failed: {error_str[:100]}...")
-            ai_analysis = "Our AI is currently at capacity. Here is a summary of your data: " + comparison_results.get("comparison_summary", "Comparison available in details.")
+            # Use the already calculated comparison summary which includes the winner name
+            ai_analysis = f"Analysis completed in Shield Mode. {comparison_results.get('comparison_summary', 'Detailed financial metrics are available for review.')} Full AI-powered breakdown is limited due to API capacity, but all numerical scores are accurate."
         
         # Generate specific recommendations for each offer (async) - run in parallel
         rec_start_time = time.time()
@@ -764,20 +800,34 @@ class AIAnalysisNode(AsyncNode):
     async def post_async(self, shared, prep_res, exec_res):
         """Store AI analysis results."""
         # Add recommendations to individual offers
-        rec_lookup = {r["offer_id"]: r["recommendation"] for r in exec_res["offer_recommendations"]}
+        rec_lookup = {r["offer_id"]: r["recommendation"] for r in exec_res["offer_recommendations"] if isinstance(r, dict)}
         
-        for offer in shared["offers"]:
+        # Create offer lookup for easy access
+        offer_lookup = {offer["id"]: offer for offer in shared.get("offers", [])}
+        
+        for offer in shared.get("offers", []):
             if offer["id"] in rec_lookup:
-                offer["ai_recommendation"] = rec_lookup[offer["id"]]
+                rec = rec_lookup[offer["id"]]
+                offer["ai_recommendation"] = rec
+                # Sync growth content for frontend rendering
+                if isinstance(rec, dict):
+                    offer["growth_description"] = rec.get("growth_description")
+                    offer["growth_points"] = rec.get("growth_points")
         
         # KEY FIX: Also update the ranked_offers list in comparison_results
         # because the frontend uses THIS list for the dashboard, not shared["offers"]
         if "comparison_results" in shared and "ranked_offers" in shared["comparison_results"]:
             for ranked_offer in shared["comparison_results"]["ranked_offers"]:
-                if ranked_offer["offer_id"] in rec_lookup: # Note: ranked_offer uses 'offer_id', original uses 'id'
-                    ranked_offer["ai_recommendation"] = rec_lookup[ranked_offer["offer_id"]]
-                elif ranked_offer.get("id") in rec_lookup: # Handle case where it might use 'id'
-                    ranked_offer["ai_recommendation"] = rec_lookup[ranked_offer["id"]]
+                offer_id = ranked_offer.get("offer_id") or ranked_offer.get("id")
+                
+                # Ensure offer_data is synchronized with the latest enriched data
+                if offer_id in offer_lookup:
+                    offer_obj = offer_lookup[offer_id]
+                    ranked_offer["offer_data"] = offer_obj
+                    
+                # Add AI recommendation
+                if offer_id in rec_lookup:
+                    ranked_offer["ai_recommendation"] = rec_lookup[offer_id]
         
         # Store comprehensive analysis
         shared["ai_analysis"] = exec_res["comprehensive_analysis"]
@@ -841,8 +891,6 @@ class AIAnalysisNode(AsyncNode):
         Location: {offer.get('location', 'Unknown')}
         Total Compensation: ${offer.get('total_compensation', 0):,}
         Estimated Net Pay (After Tax): {net_pay_str}
-        Total Score: {offer.get('score_data', {}).get('total_score', offer.get('total_score', 'N/A'))}
-        
         User Priorities: {user_preferences}
         
         Required JSON Structure:
@@ -855,15 +903,23 @@ class AIAnalysisNode(AsyncNode):
             "scores": {{
                 "compensation": 1-10,
                 "work_life_balance": 1-10,
-                "growth_potential": 1-10, 
+                "growth_potential": {offer.get("growth_score", 7.0)}, 
                 "job_stability": 1-10,
                 "culture_fit": 1-10
             }},
             "key_insights": {{
                 "pros": ["pro1", "pro2"],
                 "cons": ["con1", "con2"]
-            }}
+            }},
+            "growth_description": "A 1-2 sentence personalized career growth analysis based on the growth_score ({offer.get('growth_score', 7.0)})",
+            "growth_points": ["Specific growth bullet 1", "Specific growth bullet 2", "Specific growth bullet 3"]
         }}
+
+        IMPORTANT: Generate personalized growth content based on the growth_score ({offer.get('growth_score', 7.0)}):
+        - >= 9.0: "Exceptional career growth trajectory" + bullets like "Fast-track leadership", "Executive mentorship"
+        - >= 8.0: "Strong long-term potential" + bullets like "Technical leadership opportunities", "Continuous learning culture"
+        - >= 7.0: "Solid growth opportunities" + bullets like "Defined career ladder", "Mentorship available"
+        - < 7.0: Adjust language to reflect moderate or limited growth potential
         """
         
         json_str = ""
@@ -879,16 +935,26 @@ class AIAnalysisNode(AsyncNode):
                     if clean_str.endswith("```"):
                         clean_str = clean_str.rsplit("\n", 1)[0]
                 
-                return json.loads(clean_str)
+                analysis_res = json.loads(clean_str)
+                
+                # Ensure growth content is present, fallback to local generation if missing
+                if not analysis_res.get("growth_description") or not analysis_res.get("growth_points"):
+                    growth_content = _generate_growth_content(offer)
+                    analysis_res["growth_description"] = growth_content["growth_description"]
+                    analysis_res["growth_points"] = growth_content["growth_points"]
+                    
+                return analysis_res
 
             except Exception as e:
                 # Catch ALL errors here, including Rate Limits that bubble up
-                error_str = str(e)
+                error_str = str(e).lower()
                 print(f"[WARNING] AI Analysis failed for {offer.get('id')}: {error_str[:100]}...")
                 
                 # If it's a Quota/Rate Limit error, use Mock Data
-                if "429" in error_str or "Quota" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+                if any(k in error_str for k in ["429", "quota", "resource_exhausted", "exhausted", "limit"]):
                     print(f"[INFO] Quota hit (Caught in Node). Generating MOCK data.")
+                    # Generate personalized growth content for mock data
+                    growth_content = _generate_growth_content(offer)
                     return {
                         "verdict": {
                             "badge": "Mock Analysis 🛠️", 
@@ -898,7 +964,7 @@ class AIAnalysisNode(AsyncNode):
                         "scores": {
                             "compensation": 8.5,
                             "work_life_balance": 7.0,
-                            "growth_potential": 9.0, 
+                            "growth_potential": offer.get("growth_score", 9.0), 
                             "job_stability": 8.0,
                             "culture_fit": 7.5
                         },
@@ -906,6 +972,8 @@ class AIAnalysisNode(AsyncNode):
                             "pros": ["Excellent base salary (Mock)", "Strong brand recognition (Mock)", "Remote options available (Mock)"],
                             "cons": ["High cost of living area (Mock)", "Potential for burnout (Mock)"]
                         },
+                        "growth_description": growth_content["growth_description"],
+                        "growth_points": growth_content["growth_points"],
                         "financial_view": {
                                 "net_pay": 150000,
                                 "monthly_burn": 5000,
@@ -1386,57 +1454,76 @@ class QuickMarketAnalysisNode(AsyncParallelBatchNode):
             market_item["years_experience"]
         )
         
-        # **CRITICAL FIX**: Match MarketBenchmarkingNode exactly
-        # 1. Get universal level first (this was missing!)
-        universal_level = await get_universal_level_async(
-            market_item["company"],
-            market_item["level"] or "",
-            market_item["position"]
-        )
-        level_desc = get_level_description(universal_level)
-        print(f"  -> Identified seniority level: {level_desc}")
-        
-        # 2. Fetch market data with universal_level parameter (matching Full Analysis)
-        compensation_insights, base_percentile, total_percentile, ai_analysis = await asyncio.gather(
-            get_compensation_insights_async(
-                market_item["position"],
-                market_item["base_salary"],
-                market_item["equity"],
-                market_item["bonus"],
-                market_item["location"],
-                universal_level=universal_level
-            ),
-            calculate_market_percentile_async(
-                market_item["base_salary"],
-                market_item["position"],
-                market_item["location"],
-                universal_level=universal_level
-            ),
-            calculate_market_percentile_async(
-                market_item["total_compensation"],
-                market_item["position"],
-                market_item["location"],
-                universal_level=universal_level
-            ),
-            ai_market_analysis_async(
-                market_item["position"],
+        try:
+            # **CRITICAL FIX**: Match MarketBenchmarkingNode exactly
+            # 1. Get universal level first (this was missing!)
+            universal_level = await get_universal_level_async(
                 market_item["company"],
-                market_item["location"],
-                {
-                    "base_salary": market_item["base_salary"],
-                    "equity_value": market_item["equity"],
-                    "bonus": market_item["bonus"],
-                    "total_compensation": market_item["total_compensation"],
-                    "company_level": market_item["level"],
-                    "universal_level": universal_level
-                }
+                market_item["level"] or "",
+                market_item["position"]
             )
-        )
-        
-        end_time = time.time()
-        duration = end_time - start_time
-        end_timestamp = datetime.fromtimestamp(end_time).strftime("%H:%M:%S.%f")[:-3]
-        print(f"[DEBUG] QuickMarketAnalysis for {market_item['company']} completed at {end_timestamp}, duration: {duration:.2f}s")
+            level_desc = get_level_description(universal_level)
+            print(f"  -> Identified seniority level: {level_desc}")
+            
+            # 2. Fetch market data with universal_level parameter (matching Full Analysis)
+            # Parallel async calls for market data - run concurrently
+            compensation_insights, base_percentile, total_percentile, ai_analysis = await asyncio.gather(
+                get_compensation_insights_async(
+                    market_item["position"],
+                    market_item["base_salary"],
+                    market_item["equity"],
+                    market_item["bonus"],
+                    market_item["location"],
+                    universal_level=universal_level
+                ),
+                calculate_market_percentile_async(
+                    market_item["base_salary"],
+                    market_item["position"],
+                    market_item["location"],
+                    universal_level=universal_level
+                ),
+                calculate_market_percentile_async(
+                    market_item["total_compensation"],
+                    market_item["position"],
+                    market_item["location"],
+                    universal_level=universal_level
+                ),
+                ai_market_analysis_async(
+                    market_item["position"],
+                    market_item["company"],
+                    market_item["location"],
+                    {
+                        "base_salary": market_item["base_salary"],
+                        "equity_value": market_item["equity"],
+                        "bonus": market_item["bonus"],
+                        "total_compensation": market_item["total_compensation"],
+                        "company_level": market_item["level"],
+                        "universal_level": universal_level
+                    }
+                )
+            )
+            
+            end_time = time.time()
+            duration = end_time - start_time
+            end_timestamp = datetime.fromtimestamp(end_time).strftime("%H:%M:%S.%f")[:-3]
+            print(f"[DEBUG] QuickMarketAnalysis for {market_item['company']} completed at {end_timestamp}, duration: {duration:.2f}s")
+        except Exception as e:
+            error_str = str(e).lower()
+            if any(k in error_str for k in ["429", "quota", "resource_exhausted", "exhausted", "limit"]):
+                print(f"[INFO] Quota hit in QuickMarketAnalysis. using mock data.")
+                # Basic results for UI stability
+                return {
+                    "offer_id": market_item["offer_id"],
+                    "company_db_data": company_db_data or {},
+                    "universal_level": None,
+                    "level_description": "Unknown Level",
+                    "compensation_insights": "Mock market data (Quota reached)",
+                    "market_insights": "Mock market data (Quota reached)",
+                    "base_percentile": {"market_percentile": 50, "score": 50},
+                    "total_percentile": {"market_percentile": 50, "score": 50},
+                    "ai_analysis": "Market analysis placeholder (Quota hit)"
+                }
+            raise e
         
         return {
             "offer_id": market_item["offer_id"],
@@ -1525,7 +1612,6 @@ class QuickAIAnalysisNode(AsyncNode):
         weights = prep_data["scoring_weights"]
         
         # CRITICAL: Always calculate scores first using existing scoring logic
-        # This ensures comparison_results has proper structure with scores
         for offer in offers:
             if not offer.get("score_data"):
                 score_data = calculate_offer_score(offer, user_preferences, weights)
@@ -1534,11 +1620,17 @@ class QuickAIAnalysisNode(AsyncNode):
         # Generate proper comparison_results with scores using compare_offers
         comparison_results = compare_offers(offers, user_preferences, weights)
         
+        # Pre-calculate fallback winner data just in case
+        top_offer = comparison_results.get("top_offer", offers[0])
+        winner_id = top_offer.get("offer_id") or top_offer.get("id")
+        winner_company = top_offer.get("company", "Top choice")
+        
         # Build comprehensive prompt with all offer data
         prompt = self._build_quick_analysis_prompt(offers, user_preferences, weights)
         
-        # Single structured LLM call for AI insights (not for scores - scores are already calculated)
+        analysis_data = None
         try:
+            # Single structured LLM call for AI insights
             structured_response = await call_llm_structured_async(
                 prompt=prompt,
                 response_format={"type": "json_object"},
@@ -1552,267 +1644,164 @@ class QuickAIAnalysisNode(AsyncNode):
                 analysis_data = json.loads(structured_response)
             else:
                 analysis_data = structured_response
-            
-            # Extract new Net Value Analysis structure from LLM response
-            net_value_analysis = analysis_data.get("net_value_analysis", {})
-            raw_lifestyle = analysis_data.get("lifestyle_comparison", {})
-            lifestyle_comparison = {
-                "location_tradeoffs": ensure_markdown_string(raw_lifestyle.get("location_tradeoffs", ""), offers),
-                "hidden_costs": ensure_markdown_string(raw_lifestyle.get("hidden_costs", ""), offers)
-            }
-            summary_table = analysis_data.get("summary_table", {})
-            verdict = analysis_data.get("verdict", {})
-            reality_checks = analysis_data.get("reality_checks", {})
-            # Extract structured negotiation options (preferred) or fallback to simple list
-            negotiation_options = analysis_data.get("negotiation_options", [])
-            negotiation_opportunities = analysis_data.get("negotiation_opportunities", [])
-            # If we have structured options, use them; otherwise convert simple list to structured format
-            if not negotiation_options and negotiation_opportunities:
-                negotiation_options = [
-                    {
-                        "id": f"option_{i+1}",
-                        "title": opp.split("·")[0].strip() if "·" in opp else opp,
-                        "description": opp,
-                        "difficulty": "worth_asking",
-                        "difficulty_label": "Worth asking",
-                        "expected_value_impact": 0,
-                        "script": f"Based on the analysis, {opp}"
-                    }
-                    for i, opp in enumerate(negotiation_opportunities) if isinstance(opp, str)
-                ]
-            comparison_summary = analysis_data.get("comparison_summary", comparison_results.get("comparison_summary", "Quick analysis completed."))
-            
-            # Extract per-offer recommendations from LLM (for Smart Analysis Dashboard)
-            offer_recommendations = []
-            llm_ranked_offers = analysis_data.get("ranked_offers", [])
-            
-            for offer in offers:
-                offer_id = offer["id"]
-                # Find recommendation for this offer from LLM response
-                recommendation = None
-                for ranked in llm_ranked_offers:
-                    if ranked.get("offer_id") == offer_id or ranked.get("company") == offer.get("company"):
-                        recommendation = ranked.get("recommendation", {})
-                        break
                 
-                if not recommendation:
-                    # Fallback: create basic recommendation based on actual score
-                    score_data = offer.get("score_data", {})
-                    total_score = score_data.get("total_score", 70)
-                    recommendation = {
-                        "verdict": {
-                            "badge": "Analysis Complete",
-                            "color": "blue",
-                            "one_line_summary": f"Score: {total_score:.1f}/100"
-                        },
-                        "scores": {
-                            "compensation": min(10, total_score / 10),
-                            "work_life_balance": min(10, (offer.get("wlb_score", 7) or 7)),
-                            "growth_potential": min(10, (offer.get("growth_score", 7) or 7)),
-                            "job_stability": 7.0,
-                            "culture_fit": 7.0
-                        },
-                        "key_insights": {
-                            "pros": ["Competitive compensation", "Good growth potential"],
-                            "cons": ["Review full analysis for details"]
-                        }
-                    }
-                
-                offer_recommendations.append({
-                    "offer_id": offer_id,
-                    "recommendation": recommendation
-                })
-            
-            end_time = time.time()
-            duration = end_time - start_time
-            end_timestamp = datetime.fromtimestamp(end_time).strftime("%H:%M:%S.%f")[:-3]
-            print(f"[DEBUG] QuickAIAnalysis completed at {end_timestamp}, duration: {duration:.2f}s")
-            
-            return {
-                "net_value_analysis": net_value_analysis,
-                "lifestyle_comparison": lifestyle_comparison,
-                "summary_table": summary_table,
-                "verdict": verdict,
-                "negotiation_options": negotiation_options,
-                "negotiation_opportunities": negotiation_opportunities,  # Keep for backward compatibility
-                "reality_checks": reality_checks,
-                "comparison_summary": comparison_summary,
-                "offer_recommendations": offer_recommendations,
-                "comparison_results": comparison_results  # Use properly scored comparison_results
-            }
-            
         except Exception as e:
-            error_str = str(e)
-            print(f"[WARNING] Quick AI Analysis LLM call failed: {error_str[:100]}...")
-            print("[INFO] Generating fallback Net Value Analysis from calculated data")
-            
-            # Generate structured fallback using calculated data
-            net_value_offers = []
-            winner_id = None
-            winner_discretionary = -float('inf')
-            
-            for offer in offers:
-                net_pay = offer.get('estimated_net_pay', 0)
-                annual_expenses = offer.get('estimated_annual_expenses', 0)
-                gross_total = offer.get('total_compensation', 0)
-                estimated_tax = gross_total - net_pay
-                discretionary_income = net_pay - annual_expenses
+            error_str = str(e).lower()
+            if any(k in error_str for k in ["429", "quota", "resource_exhausted", "exhausted", "limit"]):
+                print(f"[INFO] Quota hit in QuickAIAnalysis. Generating dynamic fallback analysis.")
                 
-                net_value_offers.append({
-                    "offer_id": offer["id"],
-                    "company": offer.get("company", "Unknown"),
-                    "gross_total": gross_total,
-                    "estimated_tax": estimated_tax,
-                    "estimated_tax_amount": estimated_tax,  # Add explicit amount field
-                    "net_annual": net_pay,
-                    "annual_col": annual_expenses,
-                    "discretionary_income": discretionary_income,
-                    "discretionary_income_delta": 0  # Will calculate below
-                })
+                # Create dynamic reasoning using calculated data
+                reasoning = [
+                    f"{winner_company} is the leading recommendation with a score of {top_offer.get('total_score', 0):.1f}/100.",
+                    f"{comparison_results.get('comparison_summary', 'Detailed analysis shows strong financial alignment.')}",
+                    "Consider career growth trajectory and culture fit as detailed in the offer breakdown."
+                ]
                 
-                if discretionary_income > winner_discretionary:
-                    winner_discretionary = discretionary_income
-                    winner_id = offer["id"]
-            
-            # Calculate deltas
-            if len(net_value_offers) > 1:
-                max_discretionary = max(o["discretionary_income"] for o in net_value_offers)
-                for offer_data in net_value_offers:
-                    offer_data["discretionary_income_delta"] = offer_data["discretionary_income"] - max_discretionary
-            
-            # Build summary table
-            table_headers = ["Metric"] + [o.get("company", "Unknown") for o in offers]
-            table_rows = []
-            if len(offers) >= 2:
-                table_rows.append(["Gross Total (Inc. Equity)"] + [f"${o.get('total_compensation', 0):,}" for o in offers])
-                table_rows.append(["Estimated Tax Amount"] + [f"${net_value_offers[i].get('estimated_tax', 0):,}" for i in range(len(offers))])
-                table_rows.append(["Net Take-Home"] + [f"${o.get('estimated_net_pay', 0):,}" for o in offers])
-                table_rows.append(["Annual CoL"] + [f"${o.get('estimated_annual_expenses', 0):,}" for o in offers])
-                table_rows.append(["Final Discretionary Income"] + [f"${o.get('discretionary_income', 0):,}" for o in net_value_offers])
-            
-            # Create basic verdict
-            winner_offer = next((o for o in offers if o["id"] == winner_id), offers[0] if offers else None)
-            verdict_reasoning = [
-                f"{winner_offer.get('company', 'Unknown')} offers ${winner_discretionary:,.0f} in discretionary income",
-                "Based on calculated net pay and cost of living analysis",
-                "Consider work-life balance and career growth opportunities",
-                "Review full analysis for detailed insights"
-            ]
-            
-            # Generate structured negotiation options for all companies
-            negotiation_options = []
-            for offer in offers:
-                company_name = offer.get("company", "Unknown")
-                max_total = max(o.get('total_compensation', 0) for o in offers)
-                curr_total = offer.get('total_compensation', 0)
-                gap = max_total - curr_total if max_total > curr_total else 5000 # Default gap if winner
-                
-                # Add 3 universal options per company
-                negotiation_options.append({
-                    "id": f"opt_{offer['id']}_a",
-                    "company": company_name,
-                    "title": "Sign-on bonus",
-                    "description": f"Targeting ${int(gap):,.0f} one-time sign-on bonus.",
-                    "financial_impact": f"+${int(gap/1000)}k",
-                    "difficulty": "worth_asking",
-                    "difficulty_label": "Worth asking",
-                    "expected_value_impact": int(gap),
-                    "script": f"I'm genuinely excited about joining {company_name}. To help bridge the gap with my other current opportunities, I'd appreciate consideration for a sign-on bonus. This would help demonstrate the company's commitment to my transition."
-                })
-                
-                negotiation_options.append({
-                    "id": f"opt_{offer['id']}_b",
-                    "company": company_name,
-                    "title": "Base salary increase",
-                    "description": f"Targeting +5-10% increase in base salary.",
-                    "financial_impact": "+$15k",
-                    "difficulty": "likely_achievable",
-                    "difficulty_label": "Likely achievable",
-                    "expected_value_impact": 15000,
-                    "script": f"Thank you for the offer at {company_name}. Given my specific expertise and the market data I've reviewed for similar roles, I'd like to discuss if there's flexibility to increase the base salary to better align with the value I'll be bringing to the team."
-                })
-                
-                negotiation_options.append({
-                    "id": f"opt_{offer['id']}_c",
-                    "company": company_name,
-                    "title": "Equity refresher eligibility",
-                    "description": "Confirm timeline for subsequent grants.",
-                    "financial_impact": "Variable",
+                analysis_data = {
+                    "net_value_analysis": {
+                        "winner": winner_id,
+                        "offers": [
+                            {
+                                "offer_id": o["id"],
+                                "company": o.get("company", "Unknown"),
+                                "net_annual": o.get("estimated_net_pay", 0),
+                                "discretionary_income": o.get("estimated_net_pay", 0) - o.get("estimated_annual_expenses", 0)
+                            } for o in offers
+                        ]
+                    },
+                    "lifestyle_comparison": {
+                        "location_tradeoffs": f"Comparison of {', '.join([o.get('location', 'Unknown') for o in offers])} based on market costs.",
+                        "hidden_costs": "Analysis of local tax implications and commute factors."
+                    },
+                    "summary_table": {
+                        "headers": ["Metric"] + [o.get("company", "Unknown") for o in offers],
+                        "rows": [
+                            ["Total Score"] + [f"{o.get('score_data', {}).get('total_score', 0):.1f}" for o in offers],
+                            ["Net Pay"] + [f"${o.get('estimated_net_pay', 0):,}" for o in offers]
+                        ]
+                    },
+                    "verdict": {
+                        "recommended_offer_id": winner_id, 
+                        "summary_reasoning": f"Based on financial and qualitative metrics, {winner_company} represents the most balanced opportunity.",
+                        "detailed_summary": reasoning,
+                        "recommended_company": winner_company
+                    },
+                    "negotiation_options": [],
+                    "reality_checks": {
+                        "red_flags": ["API Limit (Shield Mode Active)"], 
+                        "considerations": ["Review individual dashboards for scoring breakdowns"]
+                    },
+                    "ranked_offers": [
+                        {
+                            "offer_id": o["id"],
+                            "company": o.get("company", "Unknown"),
+                            "total_score": o.get("score_data", {}).get("total_score", 0),
+                            **_generate_growth_content(o)
+                        } for o in offers
+                    ]
+                }
+            else:
+                # Re-raise non-quota errors
+                raise e
+        
+        # If we STILL don't have analysis_data (non-quota error caught but re-raised etc.)
+        if not analysis_data:
+             raise Exception("Failed to generate analysis data.")
+
+        # Extract/Format structures from analysis_data (Unified Extraction Layer)
+        net_value_analysis = analysis_data.get("net_value_analysis", {})
+        raw_lifestyle = analysis_data.get("lifestyle_comparison", {})
+        lifestyle_comparison = {
+            "location_tradeoffs": ensure_markdown_string(raw_lifestyle.get("location_tradeoffs", ""), offers),
+            "hidden_costs": ensure_markdown_string(raw_lifestyle.get("hidden_costs", ""), offers)
+        }
+        summary_table = analysis_data.get("summary_table", {})
+        verdict = analysis_data.get("verdict", {})
+        # Safety: Ensure fallback winner is used if verdict is thin
+        if not verdict.get("recommended_offer_id"):
+             verdict["recommended_offer_id"] = winner_id
+             verdict["recommended_company"] = winner_company
+
+        reality_checks = analysis_data.get("reality_checks", {})
+        
+        # Extract structured negotiation options
+        negotiation_options = analysis_data.get("negotiation_options", [])
+        negotiation_opportunities = analysis_data.get("negotiation_opportunities", [])
+        if not negotiation_options and negotiation_opportunities:
+            negotiation_options = [
+                {
+                    "id": f"option_{i+1}",
+                    "title": opp.split("·")[0].strip() if "·" in opp else opp,
+                    "description": opp,
                     "difficulty": "worth_asking",
                     "difficulty_label": "Worth asking",
                     "expected_value_impact": 0,
-                    "script": f"I'm very interested in the equity component of the {company_name} package. Could you clarify the policy on annual equity refreshers and how those grants are Typically structured for this level? Understanding the long-term growth potential is key for me."
-                })
+                    "script": f"Based on the analysis, {opp}"
+                }
+                for i, opp in enumerate(negotiation_opportunities) if isinstance(opp, str)
+            ]
+        
+        comparison_summary = analysis_data.get("comparison_summary", comparison_results.get("comparison_summary", "Quick analysis completed."))
+        
+        # Extract per-offer recommendations
+        offer_recommendations = []
+        llm_ranked_offers = analysis_data.get("ranked_offers", [])
+        
+        for offer in offers:
+            offer_id = offer["id"]
+            matched_ranked = next((r for r in llm_ranked_offers if r.get("offer_id") == offer_id or r.get("company") == offer.get("company")), None)
             
-            # Keep simple list for backward compatibility
-            negotiation_opportunities = [opt["title"] + " · " + opt["description"] for opt in negotiation_options]
+            if matched_ranked:
+                growth_description = matched_ranked.get("growth_description") or _generate_growth_content(offer)["growth_description"]
+                growth_points = matched_ranked.get("growth_points") or _generate_growth_content(offer)["growth_points"]
+                
+                recommendation = {
+                    "verdict": {
+                        "badge": "Analysis Complete",
+                        "color": "blue",
+                        "one_line_summary": f"Score: {matched_ranked.get('total_score', 0):.1f}/100"
+                    },
+                    "scores": {
+                        "compensation": min(10, matched_ranked.get("total_score", 0) / 10),
+                        "work_life_balance": min(10, (offer.get("wlb_score", 7) or 7)),
+                        "growth_potential": min(10, (offer.get("growth_score", 7) or 7)),
+                        "job_stability": 7.0,
+                        "culture_fit": 7.0
+                    },
+                    "key_insights": {
+                        "pros": ["Competitve offer"],
+                        "cons": ["Review full details"]
+                    },
+                    "growth_description": growth_description,
+                    "growth_points": growth_points
+                }
+            else:
+                growth_content = _generate_growth_content(offer)
+                recommendation = {
+                    "verdict": {"badge": "Analysis Complete", "color": "blue", "one_line_summary": f"Score: {offer.get('score_data', {}).get('total_score', 70):.1f}/100"},
+                    "scores": {"compensation": 7.0, "work_life_balance": 7.0, "growth_potential": 7.0, "job_stability": 7.0, "culture_fit": 7.0},
+                    "key_insights": {"pros": ["Analysis completed"], "cons": ["Full analysis recommended"]},
+                    "growth_description": growth_content["growth_description"],
+                    "growth_points": growth_content["growth_points"]
+                }
             
-            # Create basic recommendations
-            offer_recommendations = []
-            for offer in offers:
-                score_data = offer.get("score_data", {})
-                total_score = score_data.get("total_score", 70)
-                offer_recommendations.append({
-                    "offer_id": offer["id"],
-                    "recommendation": {
-                        "verdict": {
-                            "badge": "Analysis Complete",
-                            "color": "blue",
-                            "one_line_summary": f"Score: {total_score:.1f}/100"
-                        },
-                        "scores": {
-                            "compensation": min(10, total_score / 10),
-                            "work_life_balance": min(10, (offer.get("wlb_score", 7) or 7)),
-                            "growth_potential": min(10, (offer.get("growth_score", 7) or 7)),
-                            "job_stability": 7.0,
-                            "culture_fit": 7.0
-                        },
-                        "key_insights": {
-                            "pros": ["Analysis completed"],
-                            "cons": ["Full analysis recommended for detailed insights"]
-                        }
-                    }
-                })
-            
-            return {
-                "net_value_analysis": {
-                    "offers": net_value_offers,
-                    "winner": winner_id,
-                    "winner_discretionary_income": winner_discretionary
-                },
-                "lifestyle_comparison": {
-                    "location_tradeoffs": f"- Compare locations: {', '.join([o.get('location', 'Unknown') for o in offers])}\n- Consider tax implications and local state income tax brackets\n- Analyze cost of living deltas for housing and utilities\n- Evaluate quality of life and proximity to networking hubs",
-                    "hidden_costs": "- Transportation and commute expenses\n- Local and city-level taxes or surcharges\n- Differential in utility and grocery costs"
-                },
-                "summary_table": {
-                    "headers": table_headers,
-                    "rows": table_rows
-                },
-                "verdict": {
-                    "recommended_offer_id": winner_id,
-                    "recommended_company": winner_offer.get("company", "Unknown") if winner_offer else "Unknown",
-                    "is_tie": False,
-                    "summary_reasoning": f"{winner_offer.get('company', 'Unknown')} provided the best overall financial value with ${winner_discretionary:,.0f} in discretionary income.",
-                    "financial_superiority": winner_offer.get("company", "Unknown") if winner_offer else "Unknown",
-                    "reasoning": verdict_reasoning,
-                    "career_growth_considerations": "Evaluate career growth opportunities, company culture, and long-term trajectory at each organization."
-                },
-                "negotiation_options": negotiation_options,
-                "negotiation_opportunities": negotiation_opportunities,  # Keep for backward compatibility
-                "reality_checks": {
-                    "red_flags": [
-                        "Equity may be diluted in future funding rounds",
-                        "High cost of living area may reduce purchasing power"
-                    ],
-                    "considerations": [
-                        "Consider vesting schedule and cliff period",
-                        "Evaluate company growth trajectory"
-                    ]
-                },
-                "comparison_summary": comparison_results.get("comparison_summary", "Quick analysis completed."),
-                "offer_recommendations": offer_recommendations,
-                "comparison_results": comparison_results
-            }
+            offer_recommendations.append({"offer_id": offer_id, "recommendation": recommendation})
+        
+        end_time = time.time()
+        print(f"[DEBUG] QuickAIAnalysis completed in {end_time - start_time:.2f}s")
+        
+        return {
+            "net_value_analysis": net_value_analysis,
+            "lifestyle_comparison": lifestyle_comparison,
+            "summary_table": summary_table,
+            "verdict": verdict,
+            "negotiation_options": negotiation_options,
+            "negotiation_opportunities": negotiation_opportunities,
+            "reality_checks": reality_checks,
+            "comparison_summary": comparison_summary,
+            "offer_recommendations": offer_recommendations,
+            "comparison_results": comparison_results
+        }
     
     async def post_async(self, shared, prep_res, exec_res):
         """Store quick AI analysis results."""
@@ -1824,7 +1813,11 @@ class QuickAIAnalysisNode(AsyncNode):
         
         for offer in shared["offers"]:
             if offer["id"] in rec_lookup:
-                offer["ai_recommendation"] = rec_lookup[offer["id"]]
+                rec = rec_lookup[offer["id"]]
+                offer["ai_recommendation"] = rec
+                # Sync growth content for frontend rendering
+                offer["growth_description"] = rec.get("growth_description")
+                offer["growth_points"] = rec.get("growth_points")
         
         # Update ranked_offers with recommendations and ensure offer_data is populated
         comparison_results = exec_res["comparison_results"]
@@ -1832,12 +1825,12 @@ class QuickAIAnalysisNode(AsyncNode):
             for ranked_offer in comparison_results["ranked_offers"]:
                 offer_id = ranked_offer.get("offer_id") or ranked_offer.get("id")
                 
-                # Ensure offer_data is populated with full offer details
-                if "offer_data" not in ranked_offer or not ranked_offer["offer_data"]:
-                    if offer_id in offer_lookup:
-                        ranked_offer["offer_data"] = offer_lookup[offer_id]
+                # Ensure offer_data is populated with full offer details and synchronized
+                if offer_id in offer_lookup:
+                    offer_obj = offer_lookup[offer_id]
+                    ranked_offer["offer_data"] = offer_obj
                 
-                # Add AI recommendation and market data
+                # Add AI recommendation
                 if offer_id in rec_lookup:
                     ranked_offer["ai_recommendation"] = rec_lookup[offer_id]
                 
@@ -1988,10 +1981,18 @@ Provide a JSON response with this EXACT structure:
             "company": "Company Name",
             "position": "Position",
             "total_score": 85.5,
-            "rank": 1
+            "rank": 1,
+            "growth_description": "Personalized 1-2 sentence growth analysis based on growth_score (e.g., 'Strong long-term potential at Company Name for skill acquisition and technical leadership.')",
+            "growth_points": ["Career bullet 1", "Career bullet 2", "Career bullet 3"]
         }
     ]
 }
+
+IMPORTANT: For each offer in ranked_offers, generate personalized growth content based on the company's growth_score:
+- growth_score >= 9.0: "Exceptional career growth trajectory" + bullets like "Fast-track leadership", "Executive mentorship"
+- growth_score >= 8.0: "Strong long-term potential" + bullets like "Technical leadership opportunities", "Continuous learning culture"
+- growth_score >= 7.0: "Solid growth opportunities" + bullets like "Defined career ladder", "Mentorship available"
+- growth_score < 7.0: Adjust language to reflect moderate or limited growth potential
 
 Be objective, highlight hidden costs, and provide actionable insights. Focus on real financial impact and quality of life.
 """
