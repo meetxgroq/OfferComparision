@@ -327,20 +327,27 @@ class MarketResearchNode(AsyncParallelBatchNode):
                 offer["company_db_data"] = research_data["company_db_data"]
                 offer["enriched_data"] = research_data["enriched_data"]
                 
-                # Auto-populate grades consistently
+                # Auto-populate grades consistently (ONLY if not already provided by user)
                 metrics = research_data["company_research"].get("metrics", {})
                 culture_metrics = research_data["company_db_data"].get("culture_metrics", {}) if research_data.get("company_db_data") else {}
                 
-                wlb_score = culture_metrics.get("work_life_balance", metrics.get("wlb_score", {}).get("score", 7.0))
-                growth_score = culture_metrics.get("career_growth", metrics.get("growth_score", {}).get("score", 7.0))
-                benefits_score = culture_metrics.get("benefits_quality", metrics.get("benefits_score", {}).get("score", 7.0))
+                db_wlb = culture_metrics.get("work_life_balance", metrics.get("wlb_score", {}).get("score", 7.0))
+                db_growth = culture_metrics.get("career_growth", metrics.get("growth_score", {}).get("score", 7.0))
+                db_benefits = culture_metrics.get("benefits_quality", metrics.get("benefits_score", {}).get("score", 7.0))
                 
-                offer["wlb_score"] = wlb_score
-                offer["growth_score"] = growth_score
-                
-                offer["wlb_grade"] = map_score_to_grade(wlb_score)
-                offer["growth_grade"] = map_score_to_grade(growth_score)
-                offer["benefits_grade"] = map_score_to_grade(benefits_score)
+                # Priority: User Input > Database > Default
+                if not offer.get("wlb_score"):
+                    offer["wlb_score"] = db_wlb
+                if not offer.get("growth_score"):
+                    offer["growth_score"] = db_growth
+                    
+                # Grades follow the scores or remain as provided
+                if not offer.get("wlb_grade") and offer.get("wlb_score"):
+                    offer["wlb_grade"] = map_score_to_grade(offer["wlb_score"])
+                if not offer.get("growth_grade") and offer.get("growth_score"):
+                    offer["growth_grade"] = map_score_to_grade(offer["growth_score"])
+                if not offer.get("benefits_grade"):
+                    offer["benefits_grade"] = map_score_to_grade(db_benefits)
         
         print(f"Market research completed for {len(exec_res_list)} companies")
         return "default"
@@ -598,6 +605,18 @@ class MarketBenchmarkingNode(AsyncParallelBatchNode):
                 offer["total_comp_analysis"] = benchmark_data["total_percentile"]
                 offer["compensation_insights"] = benchmark_data["compensation_insights"]
                 offer["ai_market_analysis"] = benchmark_data["ai_analysis"]
+                
+                # Unified UI access fields (SCORING_ENGINE will surface them too)
+                total_p = benchmark_data["total_percentile"]
+                if isinstance(total_p, dict):
+                    offer["market_percentile"] = total_p.get("market_percentile", 50)
+                    if "market_range" in total_p and isinstance(total_p["market_range"], dict):
+                        offer["market_median"] = total_p["market_range"].get("median", 0)
+                    else:
+                        offer["market_median"] = (offer.get("total_compensation", 0)) * 0.9
+                else:
+                    offer["market_percentile"] = 50
+                    offer["market_median"] = (offer.get("total_compensation", 0)) * 0.9
         
         print("Market benchmarking completed")
         return "default"
@@ -1367,44 +1386,52 @@ class QuickMarketAnalysisNode(AsyncParallelBatchNode):
             market_item["years_experience"]
         )
         
-        # Quick market percentile calculations (synchronous, no API)
-        from utils.market_data import calculate_market_percentile, get_market_salary_range
+        # **CRITICAL FIX**: Match MarketBenchmarkingNode exactly
+        # 1. Get universal level first (this was missing!)
+        universal_level = await get_universal_level_async(
+            market_item["company"],
+            market_item["level"] or "",
+            market_item["position"]
+        )
+        level_desc = get_level_description(universal_level)
+        print(f"  -> Identified seniority level: {level_desc}")
         
-        # Run percentile calculations in parallel using asyncio
-        base_percentile_task = asyncio.to_thread(
-            calculate_market_percentile,
-            market_item["base_salary"],
-            market_item["position"],
-            market_item["location"],
-            experience_level=experience_level
+        # 2. Fetch market data with universal_level parameter (matching Full Analysis)
+        compensation_insights, base_percentile, total_percentile, ai_analysis = await asyncio.gather(
+            get_compensation_insights_async(
+                market_item["position"],
+                market_item["base_salary"],
+                market_item["equity"],
+                market_item["bonus"],
+                market_item["location"],
+                universal_level=universal_level
+            ),
+            calculate_market_percentile_async(
+                market_item["base_salary"],
+                market_item["position"],
+                market_item["location"],
+                universal_level=universal_level
+            ),
+            calculate_market_percentile_async(
+                market_item["total_compensation"],
+                market_item["position"],
+                market_item["location"],
+                universal_level=universal_level
+            ),
+            ai_market_analysis_async(
+                market_item["position"],
+                market_item["company"],
+                market_item["location"],
+                {
+                    "base_salary": market_item["base_salary"],
+                    "equity_value": market_item["equity"],
+                    "bonus": market_item["bonus"],
+                    "total_compensation": market_item["total_compensation"],
+                    "company_level": market_item["level"],
+                    "universal_level": universal_level
+                }
+            )
         )
-        total_percentile_task = asyncio.to_thread(
-            calculate_market_percentile,
-            market_item["total_compensation"],
-            market_item["position"],
-            market_item["location"],
-            experience_level=experience_level
-        )
-        market_range_task = asyncio.to_thread(
-            get_market_salary_range,
-            market_item["position"],
-            market_item["location"],
-            experience_level=experience_level
-        )
-        
-        base_percentile, total_percentile, market_range = await asyncio.gather(
-            base_percentile_task,
-            total_percentile_task,
-            market_range_task
-        )
-        
-        # Create quick compensation insights from market data
-        compensation_insights = {
-            "market_range": market_range["adjusted_range"],
-            "base_percentile": base_percentile["market_percentile"],
-            "total_percentile": total_percentile["market_percentile"],
-            "competitiveness": base_percentile.get("competitiveness", "Average")
-        }
         
         end_time = time.time()
         duration = end_time - start_time
@@ -1420,6 +1447,9 @@ class QuickMarketAnalysisNode(AsyncParallelBatchNode):
             "market_analysis": base_percentile,
             "total_percentile": total_percentile,
             "total_comp_analysis": total_percentile,
+            "universal_level": universal_level,
+            "level_description": level_desc,
+            "ai_analysis": ai_analysis,
             "experience_level": experience_level
         }
     
@@ -1436,16 +1466,20 @@ class QuickMarketAnalysisNode(AsyncParallelBatchNode):
                     # Extract metrics for compatibility
                     culture_metrics = market_data["company_db_data"].get("culture_metrics", {})
                     if culture_metrics:
-                        wlb_score = culture_metrics.get("work_life_balance", 7.0)
-                        growth_score = culture_metrics.get("career_growth", 7.5)
-                        offer["wlb_score"] = wlb_score
-                        offer["growth_score"] = growth_score
+                        # Priority: User Input > Database > Default
+                        if not offer.get("wlb_score"):
+                            offer["wlb_score"] = wlb_score
+                        if not offer.get("growth_score"):
+                            offer["growth_score"] = growth_score
                         
-                        # Use centralized grade mapping
-                        offer["wlb_grade"] = map_score_to_grade(wlb_score)
-                        offer["growth_grade"] = map_score_to_grade(growth_score)
+                        # Only re-calculate grades if they are missing
+                        if not offer.get("wlb_grade") and offer.get("wlb_score"):
+                            offer["wlb_grade"] = map_score_to_grade(offer["wlb_score"])
+                        if not offer.get("growth_grade") and offer.get("growth_score"):
+                            offer["growth_grade"] = map_score_to_grade(offer["growth_score"])
                         
-                        offer["benefits_grade"] = "A" if market_data["company_db_data"].get("glassdoor_rating", 0) >= 4.0 else "B"
+                        if not offer.get("benefits_grade"):
+                            offer["benefits_grade"] = "A" if market_data["company_db_data"].get("glassdoor_rating", 0) >= 4.0 else "B"
                 
                 # Add market data
                 offer["market_analysis"] = market_data["base_percentile"]

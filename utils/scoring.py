@@ -339,6 +339,8 @@ def compare_offers(offers_data, user_preferences=None, weights=None):
             "location": offer.get("location", "Unknown"),
             "total_score": score_data["total_score"],
             "rating": score_data["rating"],
+            "market_percentile": offer.get("market_percentile", 50),
+            "market_median": offer.get("market_median", 0),
             "score_breakdown": score_data,
             "offer_data": offer
         })

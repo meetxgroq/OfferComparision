@@ -40,17 +40,22 @@ class Offer(BaseModel):
     base_salary: float
     equity: float = 0
     bonus: float = 0
+    signing_bonus: Optional[float] = 0
     total_compensation: Optional[float] = None
     years_experience: Optional[int] = None
     vesting_years: Optional[int] = 4
-    benefits_grade: Optional[str] = None
     level: Optional[str] = None  # Internal company level (e.g. "61", "IC3")
+    benefits_grade: Optional[str] = None
+    wlb_grade: Optional[str] = None
+    growth_grade: Optional[str] = None
     wlb_score: Optional[float] = None
     growth_score: Optional[float] = None
-    growth_score: Optional[float] = None
-    # role_fit removed as it's too subjective
     work_type: Optional[str] = None
     employment_type: Optional[str] = None
+    domain: Optional[str] = None
+    job_description: Optional[str] = None
+    other_perks: Optional[str] = None
+    relocation_support: Optional[bool] = None
 
 
 class AnalyzeRequest(BaseModel):

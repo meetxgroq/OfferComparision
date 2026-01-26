@@ -201,6 +201,38 @@ COMPANY_DATABASE = {
         "glassdoor_rating": 4.1,
         "ceo_approval": 85
     },
+
+    "LinkedIn": {
+        "industry": "Technology/Social Network",
+        "size": "Large (10k-50k employees)",
+        "stage": "public",
+        "founded": 2003,
+        "headquarters": "Sunnyvale, CA",
+        "culture_metrics": {
+            "innovation": 8.2,
+            "work_life_balance": 8.4,
+            "career_growth": 8.3,
+            "compensation": 8.6,
+            "management": 8.1,
+            "diversity": 8.4,
+            "company_outlook": 8.0
+        },
+        "benefits": {
+            "health_insurance": "Excellent",
+            "dental_vision": "Excellent",
+            "retirement_401k": "3% match",
+            "pto_vacation": "Flexible PTO",
+            "parental_leave": "16 weeks paid",
+            "mental_health": "Extensive",
+            "fitness_wellness": "On-site gyms, wellness stipend",
+            "food_perks": "Free meals, snacks, gourmet drinks",
+            "learning_development": "$5,000 annual budget, LinkedIn Learning",
+            "remote_work": "Hybrid flexible",
+            "unique_perks": ["InDay", "Generous volunteer time off", "Education reimbursement"]
+        },
+        "glassdoor_rating": 4.2,
+        "ceo_approval": 92
+    },
     
     "Salesforce": {
         "industry": "Technology/SaaS",
