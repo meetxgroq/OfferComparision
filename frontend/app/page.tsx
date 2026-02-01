@@ -37,7 +37,7 @@ export default function OfferComparePage() {
   const [error, setError] = useState<string | null>(null)
   const [analysisResults, setAnalysisResults] = useState(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [useQuickAnalysis, setUseQuickAnalysis] = useState(false)
+  const [useDeepAnalysis, setUseDeepAnalysis] = useState(false)
   const [showProfileModal, setShowProfileModal] = useState(false)
   const [showPreferencesModal, setShowPreferencesModal] = useState(false)
   const [showOfferModal, setShowOfferModal] = useState(false)
@@ -131,16 +131,33 @@ export default function OfferComparePage() {
   }, [])
 
   const handleToggleSelection = useCallback((offerId: string) => {
-    setSelectedOffers(prev =>
-      prev.includes(offerId)
-        ? prev.filter(id => id !== offerId)
-        : [...prev, offerId]
-    )
+    // Clear any previous errors when interacting with selection
+    setError(null)
+
+    setSelectedOffers(prev => {
+      // Coerce to string for safe comparison (handles potential type mismatches)
+      const targetId = String(offerId)
+      // Check if it exists (using string comparison)
+      const isSelected = prev.some(id => String(id) === targetId)
+
+      // If already selected, remove it
+      if (isSelected) {
+        return prev.filter(id => String(id) !== targetId)
+      }
+
+      // If trying to select more than 2, prevent it and show error in UI
+      if (prev.length >= 2) {
+        setError("You can compare a maximum of 2 offers at a time.")
+        return prev
+      }
+
+      return [...prev, targetId]
+    })
   }, [])
 
   const runAnalysis = async () => {
     if (selectedOffers.length < 2) {
-      setError('Please select at least 2 offers to compare')
+      setError('Please select 2 offers to compare')
       return
     }
 
@@ -149,7 +166,7 @@ export default function OfferComparePage() {
 
     try {
       const selectedOfferData = offers.filter(offer => selectedOffers.includes(offer.id))
-      const endpoint = useQuickAnalysis ? '/api/analyze/quick' : '/api/analyze'
+      const endpoint = useDeepAnalysis ? '/api/analyze' : '/api/analyze/quick'
       const response = await axios.post(`http://localhost:8001${endpoint}`, {
         offers: selectedOfferData,
         user_preferences: preferences
@@ -372,24 +389,24 @@ export default function OfferComparePage() {
                   </div>
                   <div>
                     <h4 className="text-white font-medium">Offers Selected for Comparison</h4>
-                    <p className="text-slate-400 text-sm">Select at least 2 offers to unlock AI analysis.</p>
+                    <p className="text-slate-400 text-sm">Select 2 offers to unlock AI analysis.</p>
                   </div>
                 </div>
 
                 <div className="flex flex-col items-end gap-2">
-                  {/* Quick Analysis Toggle */}
+                  {/* Analysis Mode Toggle */}
                   <div className="flex items-center gap-3 mb-2">
-                    <label className="flex items-center gap-2 text-sm text-slate-400 cursor-pointer">
+                    <label className="flex items-center gap-2 text-sm text-slate-400 cursor-pointer group">
                       <input
                         type="checkbox"
-                        checked={useQuickAnalysis}
-                        onChange={(e) => setUseQuickAnalysis(e.target.checked)}
-                        className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-cyan-600 focus:ring-cyan-500 focus:ring-offset-slate-900"
+                        checked={useDeepAnalysis}
+                        onChange={(e) => setUseDeepAnalysis(e.target.checked)}
+                        className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-cyan-600 focus:ring-cyan-500 focus:ring-offset-slate-900 transition-all"
                       />
-                      <span className="flex items-center gap-1">
-                        <ClockIcon className="h-4 w-4" />
-                        Quick Analysis
-                        <span className="text-xs text-slate-500">(&lt;1 min)</span>
+                      <span className="flex items-center gap-1 group-hover:text-slate-300 transition-colors">
+                        <SparklesIcon className="h-4 w-4" />
+                        Enable Deep Analysis
+                        <span className="text-xs text-slate-500 group-hover:text-slate-400">(Includes Web Research)</span>
                       </span>
                     </label>
                   </div>
@@ -400,8 +417,8 @@ export default function OfferComparePage() {
                     className={`
                       px-8 py-4 rounded-xl font-bold text-lg flex items-center gap-3 transition-all min-w-[200px] justify-center
                       ${selectedOffers.length >= 2
-                        ? useQuickAnalysis
-                          ? 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white shadow-xl shadow-green-900/30'
+                        ? useDeepAnalysis
+                          ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-xl shadow-purple-900/30'
                           : 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white shadow-xl shadow-blue-900/30'
                         : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'}
                     `}
@@ -409,12 +426,12 @@ export default function OfferComparePage() {
                     {isAnalyzing ? (
                       <>
                         <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        <span>{useQuickAnalysis ? 'Quick Analyzing...' : 'Analyzing...'}</span>
+                        <span>{useDeepAnalysis ? 'Deep Analyzing...' : 'Analyzing...'}</span>
                       </>
                     ) : (
                       <>
                         <SparklesIcon className="h-6 w-6" />
-                        <span>{useQuickAnalysis ? 'Quick Comparison' : 'Run Comparison'}</span>
+                        <span>{useDeepAnalysis ? 'Run Deep Research' : 'Run Quick Comparison'}</span>
                       </>
                     )}
                   </button>
@@ -447,7 +464,7 @@ export default function OfferComparePage() {
                 <span className="w-2 h-8 bg-gradient-to-b from-purple-400 to-pink-600 rounded-full block"></span>
                 <h2 className="text-3xl font-bold text-white">AI Analysis Results</h2>
               </div>
-              <AnalysisResults results={analysisResults} />
+              <AnalysisResults results={analysisResults} isDeepAnalysis={useDeepAnalysis} />
             </motion.div>
           )}
         </AnimatePresence>

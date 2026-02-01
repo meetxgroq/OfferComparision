@@ -58,9 +58,10 @@ ChartJS.register(
 
 interface AnalysisResultsProps {
   results: AnalysisResults
+  isDeepAnalysis?: boolean
 }
 
-export default function AnalysisResults({ results }: AnalysisResultsProps) {
+export default function AnalysisResults({ results, isDeepAnalysis = false }: AnalysisResultsProps) {
   const [activeTab, setActiveTab] = useState<'ai' | 'charts' | 'table' | 'timeline'>('ai')
   const [selectedNegotiationOption, setSelectedNegotiationOption] = useState<string | null>(null)
   const [selectedNegotiationCompany, setSelectedNegotiationCompany] = useState<string | null>(null)
@@ -997,16 +998,18 @@ export default function AnalysisResults({ results }: AnalysisResultsProps) {
             )}
 
             {/* Visual Dashboard Loop */}
-            <div className="space-y-8">
-              <h4 className="text-xl font-bold text-white mb-6 border-b border-slate-700 pb-3 capitalize italic px-2">Interactive smart dashboard</h4>
-              {rankedOffers.map((offer) => (
-                <VisualDashboard
-                  key={offer.offer_id}
-                  offer={offer}
-                  analysis={offer.ai_recommendation}
-                />
-              ))}
-            </div>
+            {isDeepAnalysis && (
+              <div className="space-y-8">
+                <h4 className="text-xl font-bold text-white mb-6 border-b border-slate-700 pb-3 capitalize italic px-2">Interactive smart dashboard</h4>
+                {rankedOffers.map((offer) => (
+                  <VisualDashboard
+                    key={offer.offer_id}
+                    offer={offer}
+                    analysis={offer.ai_recommendation}
+                  />
+                ))}
+              </div>
+            )}
           </motion.div>
         )}
 

@@ -1634,7 +1634,7 @@ class QuickAIAnalysisNode(AsyncNode):
             structured_response = await call_llm_structured_async(
                 prompt=prompt,
                 response_format={"type": "json_object"},
-                temperature=0.3,
+                temperature=0.7, # Increased for more creative negotiation options
                 system_prompt="You are an expert career advisor. Provide comprehensive job offer analysis with rankings and recommendations in JSON format.",
                 provider=None
             )
@@ -1903,12 +1903,17 @@ YOUR TASKS - Provide a comprehensive JSON response:
 
 4. Verdict: Provide a clear recommendation with 4-5 bullet points of reasoning, considering both financial superiority and career growth.
 
-5. Negotiation Strategy: Provide 3-5 structured negotiation options for EACH company being compared. Ensure these are tailored to the specific offer terms and location. Each option should include:
-   - A clear title (e.g., "Higher salary", "Signing bonus", "Accelerated vesting")
-   - Description with expected value impact (e.g., "+$48K/year · Adds ~$133K over 4 years")
+5. Negotiation Strategy: Provide EXACTLY 3 distinct negotiation options for EACH company. You MUST include one from each category:
+   a) Financial Base (Salary/Hourly)
+   b) Equity or One-time Cash (Signing Bonus/Relocation)
+   c) Soft Benefits (PTO, WLB, Perks, or Start Date)
+   
+   Each option should include:
+   - A clear title (e.g., "Higher Base Salary", "Signing Bonus", "Extra Week of PTO")
+   - Description with expected value impact
    - difficulty: "likely_achievable", "worth_asking", or "ambitious_ask"
-   - Expected value impact in dollars
-   - A personalized negotiation script (2-3 paragraphs) that the user can copy and use
+   - Expected value impact in dollars (estimate for soft benefits)
+   - A personalized negotiation script (2-3 paragraphs)
    - MANDATORY: Include the "company" name in each negotiation option.
 
 6. Reality Checks: Identify potential red flags and important considerations for each offer. Include:
@@ -1971,6 +1976,28 @@ Provide a JSON response with this EXACT structure:
             "difficulty_label": "Likely achievable",
             "expected_value_impact": 133000,
             "script": "I'm genuinely excited about this role..."
+        },
+        {
+            "id": "option_b",
+            "company": "Company Name",
+            "title": "Signing Bonus",
+            "description": "+$25K one-time · Immediate cash flow",
+            "financial_impact": "+$25k",
+            "difficulty": "worth_asking",
+            "difficulty_label": "Worth asking",
+            "expected_value_impact": 25000,
+            "script": "Considering the relocation costs..."
+        },
+        {
+            "id": "option_c",
+            "company": "Company Name",
+            "title": "More Equity",
+            "description": "+$15K/year · Long term upside",
+            "financial_impact": "+$60k",
+            "difficulty": "ambitious_ask",
+            "difficulty_label": "Ambitious ask",
+            "expected_value_impact": 60000,
+            "script": "I believe in the long term vision..."
         }
     ],
     "negotiation_opportunities": ["Legacy field - use negotiation_options instead"],
