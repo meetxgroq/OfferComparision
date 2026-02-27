@@ -1,0 +1,15 @@
+# Backend build context
+.git
+.venv
+venv
+__pycache__
+*.pyc
+.pytest_cache
+.coverage
+htmlcov
+.env
+*.md
+docs
+frontend
+tests
+.github

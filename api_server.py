@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 
 from flow import get_sample_offers, create_quick_analysis_flow
+from utils.json_sanitize import sanitize_for_json
 from nodes import (
     MarketResearchNode,
     TaxCalculationNode,
@@ -145,6 +146,7 @@ async def run_demo() -> AnalyzeResponse:
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+    result = sanitize_for_json(result)
     return AnalyzeResponse(
         executive_summary=result.get("executive_summary", ""),
         final_report=result.get("final_report", {}),
@@ -178,6 +180,7 @@ async def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+    result = sanitize_for_json(result)
     return AnalyzeResponse(
         executive_summary=result.get("executive_summary", ""),
         final_report=result.get("final_report", {}),
@@ -222,6 +225,7 @@ async def analyze_quick(req: AnalyzeRequest) -> AnalyzeResponse:
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+    result = sanitize_for_json(result)
     return AnalyzeResponse(
         executive_summary=result.get("executive_summary", ""),
         final_report=result.get("final_report", {}),
@@ -229,7 +233,6 @@ async def analyze_quick(req: AnalyzeRequest) -> AnalyzeResponse:
         visualization_data=result.get("visualization_data", {}),
         offers=result.get("offers", []),
     )
-
 
 
 if __name__ == "__main__":

@@ -75,13 +75,13 @@ BenchMarked is an intelligent job offer analysis platform that helps professiona
    ```bash
    cd frontend
    npm run dev
-   # Runs on http://localhost:3000 (usually)
+   # Runs on http://localhost:3001
    ```
 
 ## 📖 How to Use
 
 ### 1. Web Dashboard (Recommended)
-Open your browser to `http://localhost:3000` to use the interactive interface. Add offers, adjust your preferences, and generate a comprehensive AI analysis with one click.
+Open your browser to `http://localhost:3001` to use the interactive interface. Add offers, adjust your preferences, and generate a comprehensive AI analysis with one click.
 
 ### 2. CLI Mode
 You can also run a quick demo via the terminal:
@@ -115,6 +115,35 @@ flowchart TD
 - **Detailed Metrics Comparison**: Animated bar charts below each metric row for easy visual comparison across offers
 - **Percentile Visualization**: Color-coded progress bars showing market position for base salary and total compensation
 - **Multi-Dimensional Analysis**: Radar charts, stacked bar charts, and comprehensive comparison tables
+
+## 🔧 Troubleshooting
+
+- **EMFILE (too many open files)**  
+  The dev script uses `WATCHPACK_POLLING=true` and webpack polling to reduce file watchers. If you still see this on macOS, run `ulimit -n 65536` in the same terminal before `npm run dev`.
+
+- **GET / 404 on first load**  
+  If the first request to `http://localhost:3001` returns 404, wait for "Ready" in the terminal and refresh the page.
+
+## 🐳 Docker & CI
+
+The app is **platform-independent** (macOS, Windows, Linux). API responses are sanitized so JSON is valid across environments (no invalid control characters from LLM or line-ending differences).
+
+### Docker
+
+- **Backend only:** `docker build -t offercompare-backend . && docker run -p 8001:8001 --env-file .env offercompare-backend`
+- **Backend + Frontend:** From repo root, create a `.env` with your API keys, then:
+  ```bash
+  docker compose up --build
+  ```
+  Backend: http://localhost:8001 · Frontend: http://localhost:3001
+
+### CI (GitHub Actions)
+
+`.github/workflows/ci.yml` runs on push/PR to `main`:
+
+- **Backend:** pytest, flake8, black --check
+- **Frontend:** npm ci, eslint, next build
+- **Docker:** Builds backend and frontend images after tests pass
 
 ## 🛠️ Development
 

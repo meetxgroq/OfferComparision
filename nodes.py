@@ -14,6 +14,7 @@ from utils.levels import get_universal_level_async, get_level_description
 from utils.scoring import calculate_offer_score, compare_offers, customize_weights
 from utils.viz_formatter import create_visualization_package
 from utils.company_db import get_company_data, enrich_company_data
+from utils.json_sanitize import sanitize_for_json
 import json
 import asyncio
 import time
@@ -1639,11 +1640,12 @@ class QuickAIAnalysisNode(AsyncNode):
                 provider=None
             )
             
-            # Parse JSON response
+            # Parse JSON response and sanitize for cross-platform JSON (no control chars)
             if isinstance(structured_response, str):
                 analysis_data = json.loads(structured_response)
             else:
                 analysis_data = structured_response
+            analysis_data = sanitize_for_json(analysis_data)
                 
         except Exception as e:
             error_str = str(e).lower()
