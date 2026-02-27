@@ -75,10 +75,10 @@ class TestCallLLM:
         assert len(info["available_providers"]) == 0
 
     def test_gemini_3_flash_in_cascade(self):
-        """Verify gemini-3-flash is the primary model in the Gemini cascade."""
+        """Verify gemini-3-flash-preview is the primary model in the Gemini cascade."""
         gemini_models = AI_PROVIDERS["gemini"]["models"]
-        assert "gemini-3-flash" in gemini_models
-        assert gemini_models[0] == "gemini-3-flash"
+        assert "gemini-3-flash-preview" in gemini_models
+        assert gemini_models[0] == "gemini-3-flash-preview"
 
 
 class TestCOLCalculator:

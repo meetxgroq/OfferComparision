@@ -229,12 +229,8 @@ def get_location_insights(location):
     }
 
 if __name__ == "__main__":
-    # Test cost of living calculations
-    adjustment = calculate_col_adjustment(150000, "San Francisco, CA", "Austin, TX")
-    print("COL Adjustment:", json.dumps(adjustment, indent=2))
-    
-    purchasing_power = compare_purchasing_power(120000, "Seattle, WA")
-    print("Purchasing Power:", json.dumps(purchasing_power, indent=2))
+    expenses = estimate_annual_expenses("Austin, TX")
+    print("Annual Expenses:", json.dumps(expenses, indent=2))
     
     insights = get_location_insights("Denver, CO")
     print("Location Insights:", json.dumps(insights, indent=2)) 

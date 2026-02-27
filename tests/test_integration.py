@@ -23,11 +23,11 @@ class TestFlowIntegration:
         """Test flow creation and node connections."""
         flow = create_offer_comparison_flow()
         
-        assert isinstance(flow, Flow)
-        assert flow.start is not None
-        assert hasattr(flow.start, 'prep')
-        assert hasattr(flow.start, 'exec')
-        assert hasattr(flow.start, 'post')
+        assert isinstance(flow, AsyncFlow)
+        assert flow.start_node is not None
+        assert hasattr(flow.start_node, 'prep')
+        assert hasattr(flow.start_node, 'exec')
+        assert hasattr(flow.start_node, 'post')
     
     def test_get_sample_offers(self):
         """Test sample data generation."""
@@ -77,13 +77,15 @@ class TestFlowIntegration:
         
         # Create flow starting from MarketResearchNode to skip user input
         from nodes import (
-            MarketResearchNode, COLAdjustmentNode, MarketBenchmarkingNode,
+            MarketResearchNode, TaxCalculationNode, COLAnalysisNode,
+            MarketBenchmarkingNode,
             PreferenceScoringNode, AIAnalysisNode, VisualizationPreparationNode,
             ReportGenerationNode
         )
         
         market_research = MarketResearchNode()
-        col_adjustment = COLAdjustmentNode()
+        tax_calculation = TaxCalculationNode()
+        col_analysis = COLAnalysisNode()
         market_benchmarking = MarketBenchmarkingNode()
         preference_scoring = PreferenceScoringNode()
         ai_analysis = AIAnalysisNode()
@@ -91,8 +93,9 @@ class TestFlowIntegration:
         report_generation = ReportGenerationNode()
         
         # Connect nodes
-        market_research >> col_adjustment
-        col_adjustment >> market_benchmarking
+        market_research >> tax_calculation
+        tax_calculation >> col_analysis
+        col_analysis >> market_benchmarking
         market_benchmarking >> preference_scoring
         preference_scoring >> ai_analysis
         ai_analysis >> visualization_prep
@@ -115,7 +118,7 @@ class TestFlowIntegration:
         first_offer = offers[0]
         assert "company_research" in first_offer
         assert "market_sentiment" in first_offer
-        assert "col_analysis" in first_offer
+        assert "expense_analysis" in first_offer
         assert "market_analysis" in first_offer
 
 
@@ -345,18 +348,15 @@ class TestPerformanceBenchmarks:
     
     def test_col_calculation_performance(self):
         """Benchmark cost of living calculations."""
-        from utils.col_calculator import calculate_col_adjustment
+        from utils.col_calculator import estimate_annual_expenses
         
         import time
         start_time = time.time()
         
+        locations = ["San Francisco, CA", "Seattle, WA", "Austin, TX", "New York, NY"]
         # Run 100 calculations
         for i in range(100):
-            calculate_col_adjustment(
-                100000 + i * 1000,
-                "San Francisco, CA",
-                "Seattle, WA"
-            )
+            estimate_annual_expenses(locations[i % len(locations)])
         
         end_time = time.time()
         avg_time = (end_time - start_time) / 100
