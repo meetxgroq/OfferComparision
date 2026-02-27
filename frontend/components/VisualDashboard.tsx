@@ -76,7 +76,7 @@ export default function VisualDashboard({ analysis, offer }: VisualDashboardProp
                             <span>{verdict.badge}</span>
                         </span>
                     </h3>
-                    <p className="text-slate-400 text-sm mt-1">"{verdict.one_line_summary}"</p>
+                    <p className="text-slate-400 text-sm mt-1">&ldquo;{verdict.one_line_summary}&rdquo;</p>
                 </div>
                 <div className="text-right hidden sm:block">
                     <div className="text-2xl font-bold text-white">{scores?.growth_potential}/10</div>
