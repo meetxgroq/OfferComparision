@@ -97,6 +97,25 @@ flowchart LR
 
 ---
 
+## Pre-requisite: Upgrade Gemini API to Pay-as-you-go
+
+The deployment plan (Phase 1) currently specifies **Gemini AI Studio Free Tier** (no billing, no credit card). This is incompatible with monetization because:
+
+- Free tier hard caps: Flash 250 RPD, Flash-Lite 1,000 RPD
+- At 5-8 LLM calls per analysis, free tier supports ~156-250 analyses/day max
+- **Paying users hitting rate limits is unacceptable** -- you cannot charge for an unreliable service
+
+**Required change**: Enable billing on the Gemini API key in Google AI Studio.
+
+- **Paid tier limits**: 2,000 RPM, no RPD cap (pay per token)
+- **Cost**: ~~$0.001-0.003 per analysis (~~$7.50/month at 2,500 analyses/month)
+- **No code changes needed** -- `utils/call_llm.py` already handles cascade, retry, and fallback; it works identically on the paid tier
+- **Action**: In [Google AI Studio](https://aistudio.google.com/) -> API key settings -> Enable billing (requires a Google Cloud billing account linked to the project)
+
+This replaces the "Cost: $0" note in the deployment plan's Phase 1 with a small variable cost (~$5-10/month) that is more than covered by subscription revenue.
+
+---
+
 ## Phase 1: Database Schema Changes (Supabase)
 
 ### Modify `user_usage` table
@@ -293,6 +312,9 @@ No new env vars strictly required (Checkout is server-side redirect). Optionally
 
 ## Cost Impact
 
+- **Gemini API (pay-as-you-go)**: ~$0.001-0.003 per analysis
+  - At 2,500 analyses/month: ~$7.50/month
+  - Scales linearly with usage
 - **Stripe fees**: 2.9% + $0.30 per transaction
   - Pro ($9/mo): Stripe takes $0.56 -> you keep $8.44
   - Power ($19/mo): Stripe takes $0.85 -> you keep $18.15
@@ -300,7 +322,9 @@ No new env vars strictly required (Checkout is server-side redirect). Optionally
 - **Revenue projection** (conservative, 1K users):
   - 5% convert to Pro (50 users): $422/mo
   - 1% convert to Power (10 users): $182/mo
-  - **Total**: ~$600/mo gross
+  - **Gross revenue**: ~$604/mo
+  - **Costs**: ~$7.50 (Gemini) + ~$36.50 (Stripe fees) = ~$44/mo
+  - **Net revenue**: ~$560/mo
 
 ---
 
