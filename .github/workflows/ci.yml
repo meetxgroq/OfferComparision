@@ -64,6 +64,8 @@ jobs:
       - name: Build
         env:
           NEXT_PUBLIC_API_BASE: http://localhost:8001
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
         run: npm run build
 
   docker:
@@ -75,4 +77,8 @@ jobs:
       - name: Build backend image
         run: docker build -t offercompare-backend:ci .
       - name: Build frontend image
-        run: docker build -t offercompare-frontend:ci ./frontend
+        env:
+          NEXT_PUBLIC_API_BASE: http://localhost:8001
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
+        run: docker build -t offercompare-frontend:ci --build-arg NEXT_PUBLIC_API_BASE=http://localhost:8001 --build-arg NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=placeholder ./frontend

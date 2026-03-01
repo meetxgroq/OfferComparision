@@ -6,16 +6,18 @@ import axios from 'axios'
 import {
   PlusIcon,
   DocumentTextIcon,
-  CogIcon,
   ChartBarIcon,
   SparklesIcon,
   CloudArrowUpIcon,
   XMarkIcon,
   AdjustmentsHorizontalIcon,
   ArrowRightIcon,
-  ClockIcon
+  ArrowRightOnRectangleIcon
 } from '@heroicons/react/24/outline'
 
+import { useAuth } from '@/contexts/AuthContext'
+import { getApiBase, authHeaders } from '@/lib/api'
+import LoginButton from '@/components/LoginButton'
 import ProfileManager from '@/components/ProfileManager'
 import AdvancedOfferForm from '@/components/AdvancedOfferForm'
 import PreferencesPanel from '@/components/PreferencesPanel'
@@ -24,6 +26,7 @@ import AnalysisResults from '@/components/AnalysisResults'
 import { Offer, UserPreferences } from '@/types'
 
 export default function OfferComparePage() {
+  const { user, loading, signOut, getAccessToken } = useAuth()
   const [offers, setOffers] = useState<Offer[]>([])
   const [selectedOffers, setSelectedOffers] = useState<string[]>([])
   const [preferences, setPreferences] = useState<UserPreferences>({
@@ -165,12 +168,14 @@ export default function OfferComparePage() {
     setError(null)
 
     try {
+      const token = await getAccessToken()
+      const base = getApiBase()
       const selectedOfferData = offers.filter(offer => selectedOffers.includes(offer.id))
       const endpoint = useDeepAnalysis ? '/api/analyze' : '/api/analyze/quick'
-      const response = await axios.post(`http://localhost:8001${endpoint}`, {
+      const response = await axios.post(`${base}${endpoint}`, {
         offers: selectedOfferData,
         user_preferences: preferences
-      })
+      }, { headers: authHeaders(token) })
       setAnalysisResults(response.data)
 
       // Synchronize global offers state with AI-enriched data to ensure Job Cards match Snapshot
@@ -215,6 +220,12 @@ export default function OfferComparePage() {
       if (errorMessage.toLowerCase().includes('api key')) {
         errorMessage += ' Tip: Please check your .env file and ensure you have a valid API key set.'
       }
+      if (error.response?.status === 429) {
+        errorMessage = 'Daily limit of 2 comparisons reached. Resets at midnight.'
+      }
+      if (error.response?.status === 401) {
+        errorMessage = 'Session expired. Please sign in again.'
+      }
 
       setError(errorMessage)
     } finally {
@@ -243,6 +254,38 @@ export default function OfferComparePage() {
     }
   }, [])
 
+  if (!loading && !user) {
+    return (
+      <div className="min-h-screen font-sans selection:bg-cyan-500/30">
+        <div className="fixed top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
+          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-500/10 rounded-full blur-3xl animate-blob"></div>
+          <div className="absolute top-[20%] right-[-10%] w-[40%] h-[40%] bg-cyan-500/10 rounded-full blur-3xl animate-blob animation-delay-2000"></div>
+          <div className="absolute bottom-[-10%] left-[20%] w-[50%] h-[50%] bg-blue-500/10 rounded-full blur-3xl animate-blob animation-delay-4000"></div>
+        </div>
+        <header className="glass border-b border-white/5">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center h-20">
+              <div className="flex items-center space-x-4">
+                <div className="bg-gradient-to-br from-cyan-500 to-blue-600 p-2.5 rounded-xl shadow-lg shadow-cyan-500/20">
+                  <ChartBarIcon className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white via-cyan-100 to-blue-200">
+                    BenchMarked
+                  </h1>
+                  <p className="text-xs text-slate-400 font-medium tracking-wider">INTELLIGENT CAREER ANALYSIS</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </header>
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <LoginButton />
+        </main>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen font-sans selection:bg-cyan-500/30">
 
@@ -270,6 +313,16 @@ export default function OfferComparePage() {
             </div>
 
             <div className="flex items-center space-x-4">
+              <span className="text-slate-500 text-sm truncate max-w-[120px]" title={user?.email ?? ''}>
+                {user?.email ?? ''}
+              </span>
+              <button
+                onClick={() => signOut()}
+                className="text-slate-400 hover:text-cyan-400 transition-colors p-2"
+                title="Sign out"
+              >
+                <ArrowRightOnRectangleIcon className="h-5 w-5" />
+              </button>
               <button
                 onClick={handleClearAllData}
                 className="text-slate-400 hover:text-red-400 transition-colors p-2"

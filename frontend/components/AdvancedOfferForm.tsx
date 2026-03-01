@@ -12,6 +12,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { Offer, WORK_TYPES, EMPLOYMENT_TYPES, DOMAINS, BENEFITS_GRADES } from '@/types'
 import { POPULAR_COMPANIES } from '@/data/companies'
+import { getApiBase } from '@/lib/api'
 import FileUpload from './FileUpload'
 import Slider from './Slider'
 
@@ -59,7 +60,7 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
   useEffect(() => {
     const fetchPositions = async () => {
       try {
-        const res = await fetch('http://localhost:8001/api/positions');
+        const res = await fetch(`${getApiBase()}/api/positions`);
         if (res.ok) {
           const data = await res.json();
           if (data.positions) {
@@ -149,7 +150,7 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
           position: formData.position || "Software Engineer"
         });
 
-        const res = await fetch(`http://localhost:8001/api/levels?${queryParams}`);
+        const res = await fetch(`${getApiBase()}/api/levels?${queryParams}`);
         if (res.ok) {
           const data = await res.json();
           if (data.levels && data.levels.length > 0) {

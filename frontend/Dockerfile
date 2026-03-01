@@ -11,7 +11,11 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ARG NEXT_PUBLIC_API_BASE=http://localhost:8001
+ARG NEXT_PUBLIC_SUPABASE_URL=https://buwtfydnuiuavkveovhb.supabase.co
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_Qd04MJv2a_AFUdJbSOssoA_knNxgjip
 ENV NEXT_PUBLIC_API_BASE=$NEXT_PUBLIC_API_BASE
+ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
 RUN npm run build
 
 FROM node:20-alpine AS runner

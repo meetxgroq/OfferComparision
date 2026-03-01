@@ -1,6 +1,7 @@
 # OfferCompare Pro - Backend + Frontend
 # Run: docker compose up --build
 # Backend: http://localhost:8001  Frontend: http://localhost:3001
+# Set SUPABASE_* and GEMINI_API_KEY in .env for auth and LLM.
 
 services:
   backend:
@@ -14,6 +15,10 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - DEFAULT_AI_PROVIDER=${DEFAULT_AI_PROVIDER:-gemini}
+      - SUPABASE_URL=${SUPABASE_URL:-}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY:-}
+      - SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET:-}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001}
     env_file:
       - .env
 
@@ -23,9 +28,13 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_BASE: http://localhost:8001
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
     ports:
       - "3001:3001"
     depends_on:
       - backend
     environment:
       - NEXT_PUBLIC_API_BASE=http://localhost:8001
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL:-}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}

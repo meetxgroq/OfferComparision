@@ -11,8 +11,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Default: run API on 8001 (match api_server.py)
+# Default: run API on 8001; Cloud Run sets PORT at runtime
 ENV PORT=8001
 EXPOSE 8001
-
-CMD ["python", "-m", "uvicorn", "api_server:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD ["sh", "-c", "exec python -m uvicorn api_server:app --host 0.0.0.0 --port ${PORT:-8001}"]
