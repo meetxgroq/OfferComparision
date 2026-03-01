@@ -21,7 +21,7 @@ _jwks_cache: Optional[dict] = None
 _jwks_cached_at: Optional[datetime] = None
 
 DAILY_LIMIT = 2
-SUPPORTED_JWT_ALGS = {"ES256", "RS256"}
+SUPPORTED_JWKS_ALGS = {"ES256", "RS256"}
 JWKS_CACHE_SECONDS = 300
 
 
@@ -71,10 +71,14 @@ def _fetch_jwks(force_refresh: bool = False) -> dict:
         response.raise_for_status()
         jwks = response.json()
     except requests.RequestException as exc:
+        if _jwks_cache is not None:
+            return _jwks_cache
         raise HTTPException(status_code=503, detail="Unable to fetch Supabase JWKS") from exc
 
     keys = jwks.get("keys") if isinstance(jwks, dict) else None
     if not isinstance(keys, list) or not keys:
+        if _jwks_cache is not None:
+            return _jwks_cache
         raise HTTPException(status_code=503, detail="Supabase JWKS is invalid or empty")
 
     _jwks_cache = jwks
@@ -97,7 +101,7 @@ def _find_signing_key(token: str) -> dict:
         key = next((item for item in jwks["keys"] if item.get("kid") == kid), None)
         if key:
             alg = key.get("alg")
-            if alg and alg not in SUPPORTED_JWT_ALGS:
+            if alg and alg not in SUPPORTED_JWKS_ALGS:
                 raise HTTPException(status_code=401, detail="Unsupported token signing algorithm")
             return key
 
@@ -109,13 +113,25 @@ def verify_jwt(authorization: Optional[str] = Header(None)) -> str:
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
     token = authorization.replace("Bearer ", "").strip()
-    key = _find_signing_key(token)
     supabase_url = _get_supabase_url()
+
+    try:
+        token_headers = jwt.get_unverified_header(token)
+    except JWTError as exc:
+        raise HTTPException(status_code=401, detail="Invalid token header") from exc
+
+    token_alg = token_headers.get("alg")
+    if token_alg not in SUPPORTED_JWKS_ALGS:
+        raise HTTPException(status_code=401, detail="Unsupported token signing algorithm")
+
+    key = _find_signing_key(token)
+    decode_algorithms = list(SUPPORTED_JWKS_ALGS)
+
     try:
         payload = jwt.decode(
             token,
             key,
-            algorithms=list(SUPPORTED_JWT_ALGS),
+            algorithms=decode_algorithms,
             audience="authenticated",
             issuer=f"{supabase_url}/auth/v1",
         )
