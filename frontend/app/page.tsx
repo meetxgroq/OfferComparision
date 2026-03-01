@@ -208,6 +208,18 @@ export default function OfferComparePage() {
       console.error('Analysis failed:', error)
       let errorMessage = 'Analysis failed. Please try again.'
 
+      // Axios "Network Error" = no response (backend unreachable, CORS, or wrong URL)
+      const isNetworkError =
+        error.message === 'Network Error' ||
+        error.code === 'ERR_NETWORK' ||
+        (error.request && !error.response)
+      if (isNetworkError) {
+        const base = getApiBase()
+        errorMessage = `Cannot reach the API at ${base}. Make sure the backend is running (e.g. on port 8001) and CORS allows this origin.`
+        setError(errorMessage)
+        return
+      }
+
       const detail = error.response?.data?.detail
       if (typeof detail === 'string') {
         errorMessage = detail

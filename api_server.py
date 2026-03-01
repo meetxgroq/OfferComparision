@@ -17,6 +17,7 @@ from typing import List, Dict, Any, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from flow import get_sample_offers, create_quick_analysis_flow
@@ -81,6 +82,7 @@ class AnalyzeResponse(BaseModel):
 
 app = FastAPI(title="BenchMarked API", version="1.0.0")
 
+# CORS: include the exact frontend origin (e.g. Vercel URL or http://localhost:3000)
 _origins = os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001")
 _origins_list = [o.strip() for o in _origins.split(",") if o.strip()]
 
@@ -91,6 +93,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.options("/api/analyze")
+@app.options("/api/analyze/quick")
+async def analyze_options() -> Response:
+    """Respond to CORS preflight so browsers get 200 before the actual POST."""
+    return Response(status_code=200)
 
 
 def _require_auth_and_rate_limit(authorization: Optional[str] = Header(None)) -> str:

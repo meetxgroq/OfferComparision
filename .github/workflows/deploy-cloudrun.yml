@@ -1,6 +1,10 @@
 # Deploy backend to Google Cloud Run on push to main.
-# Required secrets: GCP_SERVICE_ACCOUNT_KEY (JSON key with Cloud Run + Artifact Registry permissions)
-# Required repo vars (or secrets): GCP_PROJECT_ID, GCP_REGION (e.g. us-central1)
+# This job runs only when CLOUD_RUN_DEPLOY is enabled (see below), so CI does not fail if you haven't set GCP secrets yet.
+#
+# To enable:
+# 1. Repo Settings → Secrets and variables → Actions: add secret GCP_SERVICE_ACCOUNT_KEY (JSON key for a service account with Cloud Run Admin + Storage).
+# 2. Add variables: GCP_PROJECT_ID, GCP_REGION (e.g. us-central1).
+# 3. Add variable CLOUD_RUN_DEPLOY = true (so this job runs).
 
 name: Deploy to Cloud Run
 
@@ -13,6 +17,7 @@ jobs:
   deploy:
     name: Deploy Backend to Cloud Run
     runs-on: ubuntu-latest
+    if: vars.CLOUD_RUN_DEPLOY == 'true'
     permissions:
       contents: read
       id-token: write

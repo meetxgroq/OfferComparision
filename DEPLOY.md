@@ -135,9 +135,10 @@ or in the Cloud Run console add `ALLOWED_ORIGINS` with your production and previ
 ## 6. CI/CD (optional)
 
 - **Vercel**: Auto-deploys frontend from GitHub; no extra config.
-- **Cloud Run**: Use [.github/workflows/deploy-cloudrun.yml](.github/workflows/deploy-cloudrun.yml). Add secrets/variables:
-  - **Secrets**: `GCP_SERVICE_ACCOUNT_KEY` = JSON key for a service account with Cloud Run Admin + Storage (for build).
-  - **Variables**: `GCP_PROJECT_ID`, `GCP_REGION` (e.g. `us-central1`).
+- **Cloud Run**: The workflow [.github/workflows/deploy-cloudrun.yml](.github/workflows/deploy-cloudrun.yml) is **skipped by default** so CI does not fail if GCP secrets are not set. To enable deploy on push to main:
+  1. Repo **Settings → Secrets and variables → Actions**: add secret **GCP_SERVICE_ACCOUNT_KEY** (JSON key for a service account with Cloud Run Admin + Storage).
+  2. Add variables **GCP_PROJECT_ID** and **GCP_REGION** (e.g. `us-central1`).
+  3. Add variable **CLOUD_RUN_DEPLOY** = `true` so the deploy job runs.
 
 ## 7. Scaling and limits
 
