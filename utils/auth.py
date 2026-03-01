@@ -5,6 +5,7 @@ Used by FastAPI to protect /api/analyze and /api/analyze/quick.
 
 from __future__ import annotations
 
+import logging
 import os
 from datetime import date, datetime, timezone
 from typing import Optional
@@ -23,6 +24,8 @@ _jwks_cached_at: Optional[datetime] = None
 DAILY_LIMIT = 2
 SUPPORTED_JWKS_ALGS = {"ES256", "RS256"}
 JWKS_CACHE_SECONDS = 300
+
+logger = logging.getLogger(__name__)
 
 
 def _get_supabase() -> Client:
@@ -46,7 +49,14 @@ def _get_supabase_url() -> str:
             status_code=503,
             detail="Auth not configured (SUPABASE_URL missing)",
         )
-    return url.rstrip("/")
+    return url.strip().rstrip("/")
+
+
+def _get_jwks_urls(supabase_url: str) -> list[str]:
+    return [
+        f"{supabase_url}/auth/v1/.well-known/jwks.json",
+        f"{supabase_url}/auth/v1/jwks",
+    ]
 
 
 def _should_refresh_jwks(now: datetime) -> bool:
@@ -64,20 +74,29 @@ def _fetch_jwks(force_refresh: bool = False) -> dict:
         return _jwks_cache
 
     supabase_url = _get_supabase_url()
-    jwks_url = f"{supabase_url}/auth/v1/.well-known/jwks.json"
+    jwks = None
+    last_exc: Optional[Exception] = None
 
-    try:
-        response = requests.get(jwks_url, timeout=5)
-        response.raise_for_status()
-        jwks = response.json()
-    except requests.RequestException as exc:
+    for jwks_url in _get_jwks_urls(supabase_url):
+        try:
+            response = requests.get(jwks_url, timeout=(3.05, 10))
+            response.raise_for_status()
+            jwks = response.json()
+            break
+        except (requests.RequestException, ValueError) as exc:
+            last_exc = exc
+            logger.warning("JWKS fetch failed", extra={"jwks_url": jwks_url, "error": str(exc)})
+
+    if jwks is None:
         if _jwks_cache is not None:
+            logger.warning("Using cached JWKS after fetch failure")
             return _jwks_cache
-        raise HTTPException(status_code=503, detail="Unable to fetch Supabase JWKS") from exc
+        raise HTTPException(status_code=503, detail="Unable to fetch Supabase JWKS") from last_exc
 
     keys = jwks.get("keys") if isinstance(jwks, dict) else None
     if not isinstance(keys, list) or not keys:
         if _jwks_cache is not None:
+            logger.warning("Using cached JWKS because fetched JWKS was empty/invalid")
             return _jwks_cache
         raise HTTPException(status_code=503, detail="Supabase JWKS is invalid or empty")
 
