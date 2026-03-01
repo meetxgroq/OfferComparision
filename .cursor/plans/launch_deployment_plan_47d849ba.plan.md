@@ -4,37 +4,37 @@ overview: "Deploy BenchMarked for up to 1,000 users with auth + per-user rate li
 todos:
   - id: gemini-api-key
     content: Get Gemini API key from Google AI Studio (free, no credit card)
-    status: pending
+    status: completed
   - id: supabase-setup
     content: Create Supabase project, enable Google OAuth, create user_usage table with RLS policies
-    status: pending
+    status: completed
   - id: frontend-auth
     content: "Add Supabase Auth to Next.js frontend: Google Sign-In, auth context, protected routes, pass JWT to API"
-    status: pending
+    status: completed
   - id: backend-auth
     content: Add JWT verification middleware to FastAPI, per-user rate limit check (2/day) against Supabase DB
-    status: pending
+    status: completed
   - id: cors-update
     content: Update api_server.py CORS to accept production Vercel domain and read origins from env
-    status: pending
+    status: completed
   - id: port-env
     content: Add PORT environment variable support in api_server.py for Cloud Run compatibility
-    status: pending
+    status: completed
   - id: cloud-run-deploy
     content: Create GCP project, enable Cloud Run, deploy backend Docker container
-    status: pending
+    status: completed
   - id: vercel-deploy
     content: Connect GitHub repo to Vercel, set NEXT_PUBLIC_API_BASE to Cloud Run URL, deploy frontend
-    status: pending
+    status: completed
   - id: env-secrets
     content: "Configure all secrets: GEMINI_API_KEY, SUPABASE_URL, SUPABASE_KEY in Cloud Run + Vercel"
-    status: pending
+    status: completed
   - id: cicd-deploy
     content: Add Cloud Run deploy step to GitHub Actions CI/CD pipeline
-    status: pending
+    status: completed
   - id: scaling-plan
     content: Monitor usage; upgrade to paid Gemini tier and scale Cloud Run instances as needed
-    status: pending
+    status: completed
 isProject: false
 ---
 
@@ -137,7 +137,7 @@ flowchart LR
 
 1. Go to [supabase.com](https://supabase.com), sign up (free, no credit card)
 2. Create a new project (e.g., `benchmarked`)
-3. Note down: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, and `JWT_SECRET`
+3. Note down: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` (JWT verification uses Supabase signing keys via JWKS)
 
 ### Step 2b: Enable Google OAuth
 
@@ -232,19 +232,30 @@ flowchart TD
 
 ```python
 # Pseudocode for the auth middleware
-import jwt
+from jose import jwt
+import requests
 from supabase import create_client
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_SERVICE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
-JWT_SECRET = os.environ["SUPABASE_JWT_SECRET"]
+JWKS_URL = f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json"
 
 supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 async def verify_and_rate_limit(authorization: str):
-    # 1. Decode JWT
+  # 1. Decode JWT via Supabase JWKS signing keys
     token = authorization.replace("Bearer ", "")
-    payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"], audience="authenticated")
+  headers = jwt.get_unverified_header(token)
+  kid = headers["kid"]
+  jwks = requests.get(JWKS_URL).json()
+  key = next(k for k in jwks["keys"] if k["kid"] == kid)
+  payload = jwt.decode(
+    token,
+    key,
+    algorithms=["ES256", "RS256"],
+    audience="authenticated",
+    issuer=f"{SUPABASE_URL}/auth/v1",
+  )
     user_id = payload["sub"]
     
     # 2. Check/update usage in user_usage table
@@ -283,7 +294,6 @@ async def verify_and_rate_limit(authorization: str):
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` -- frontend
 - `SUPABASE_URL` -- backend
 - `SUPABASE_SERVICE_ROLE_KEY` -- backend (never expose to frontend)
-- `SUPABASE_JWT_SECRET` -- backend
 
 ---
 
@@ -336,10 +346,9 @@ async def verify_and_rate_limit(authorization: str):
    gcloud secrets create gemini-api-key --data-file=- <<< "your-gemini-key"
    gcloud secrets create supabase-url --data-file=- <<< "https://xxx.supabase.co"
    gcloud secrets create supabase-service-key --data-file=- <<< "your-service-role-key"
-   gcloud secrets create supabase-jwt-secret --data-file=- <<< "your-jwt-secret"
 
    gcloud run services update benchmarked-api \
-     --set-secrets "GEMINI_API_KEY=gemini-api-key:latest,SUPABASE_URL=supabase-url:latest,SUPABASE_SERVICE_ROLE_KEY=supabase-service-key:latest,SUPABASE_JWT_SECRET=supabase-jwt-secret:latest"
+     --set-secrets "GEMINI_API_KEY=gemini-api-key:latest,SUPABASE_URL=supabase-url:latest,SUPABASE_SERVICE_ROLE_KEY=supabase-service-key:latest"
    
 
 ```
@@ -362,7 +371,7 @@ async def verify_and_rate_limit(authorization: str):
 
 ```
 
-- Add to [requirements.txt](requirements.txt): `supabase>=2.0.0`, `PyJWT>=2.8.0`
+- Add to [requirements.txt](requirements.txt): `supabase>=2.0.0`, `python-jose[cryptography]>=3.3.0`
 
 ---
 

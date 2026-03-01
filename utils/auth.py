@@ -9,14 +9,20 @@ import os
 from datetime import date, datetime, timezone
 from typing import Optional
 
-import jwt
+import requests
 from fastapi import HTTPException, Header
+from jose import jwt
+from jose.exceptions import JWTError
 from supabase import create_client, Client
 
 # Lazy-init Supabase client (requires env at runtime)
 _supabase: Optional[Client] = None
+_jwks_cache: Optional[dict] = None
+_jwks_cached_at: Optional[datetime] = None
 
 DAILY_LIMIT = 2
+SUPPORTED_JWT_ALGS = {"ES256", "RS256"}
+JWKS_CACHE_SECONDS = 300
 
 
 def _get_supabase() -> Client:
@@ -33,14 +39,69 @@ def _get_supabase() -> Client:
     return _supabase
 
 
-def _get_jwt_secret() -> str:
-    secret = os.environ.get("SUPABASE_JWT_SECRET")
-    if not secret:
+def _get_supabase_url() -> str:
+    url = os.environ.get("SUPABASE_URL")
+    if not url:
         raise HTTPException(
             status_code=503,
-            detail="Auth not configured (SUPABASE_JWT_SECRET missing)",
+            detail="Auth not configured (SUPABASE_URL missing)",
         )
-    return secret
+    return url.rstrip("/")
+
+
+def _should_refresh_jwks(now: datetime) -> bool:
+    if _jwks_cache is None or _jwks_cached_at is None:
+        return True
+    age = (now - _jwks_cached_at).total_seconds()
+    return age >= JWKS_CACHE_SECONDS
+
+
+def _fetch_jwks(force_refresh: bool = False) -> dict:
+    global _jwks_cache, _jwks_cached_at
+
+    now = datetime.now(timezone.utc)
+    if not force_refresh and not _should_refresh_jwks(now):
+        return _jwks_cache
+
+    supabase_url = _get_supabase_url()
+    jwks_url = f"{supabase_url}/auth/v1/.well-known/jwks.json"
+
+    try:
+        response = requests.get(jwks_url, timeout=5)
+        response.raise_for_status()
+        jwks = response.json()
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=503, detail="Unable to fetch Supabase JWKS") from exc
+
+    keys = jwks.get("keys") if isinstance(jwks, dict) else None
+    if not isinstance(keys, list) or not keys:
+        raise HTTPException(status_code=503, detail="Supabase JWKS is invalid or empty")
+
+    _jwks_cache = jwks
+    _jwks_cached_at = now
+    return jwks
+
+
+def _find_signing_key(token: str) -> dict:
+    try:
+        headers = jwt.get_unverified_header(token)
+    except JWTError as exc:
+        raise HTTPException(status_code=401, detail="Invalid token header") from exc
+
+    kid = headers.get("kid")
+    if not kid:
+        raise HTTPException(status_code=401, detail="Token missing key id (kid)")
+
+    for force_refresh in (False, True):
+        jwks = _fetch_jwks(force_refresh=force_refresh)
+        key = next((item for item in jwks["keys"] if item.get("kid") == kid), None)
+        if key:
+            alg = key.get("alg")
+            if alg and alg not in SUPPORTED_JWT_ALGS:
+                raise HTTPException(status_code=401, detail="Unsupported token signing algorithm")
+            return key
+
+    raise HTTPException(status_code=401, detail="Signing key not found for token")
 
 
 def verify_jwt(authorization: Optional[str] = Header(None)) -> str:
@@ -48,16 +109,17 @@ def verify_jwt(authorization: Optional[str] = Header(None)) -> str:
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
     token = authorization.replace("Bearer ", "").strip()
-    secret = _get_jwt_secret()
+    key = _find_signing_key(token)
+    supabase_url = _get_supabase_url()
     try:
         payload = jwt.decode(
             token,
-            secret,
-            algorithms=["HS256"],
+            key,
+            algorithms=list(SUPPORTED_JWT_ALGS),
             audience="authenticated",
-            options={"verify_exp": True},
+            issuer=f"{supabase_url}/auth/v1",
         )
-    except jwt.InvalidTokenError as e:
+    except JWTError as e:
         raise HTTPException(status_code=401, detail="Invalid or expired token") from e
     user_id = payload.get("sub")
     if not user_id:

@@ -66,7 +66,8 @@ This doc covers deploying the app for production (Vercel + Cloud Run + Supabase 
    - **Site URL**: your production URL, e.g. `https://benchmarked-ashen.vercel.app`
    - **Redirect URLs**: add `http://localhost:3000/**`, `http://localhost:3001/**`, `https://benchmarked-ashen.vercel.app/**`, and `https://*.vercel.app/**`
 4. **SQL Editor**: Run the migration [supabase/migrations/001_user_usage.sql](supabase/migrations/001_user_usage.sql).
-5. **Settings → API**: Note **Project URL**, **Publishable** key (client-safe; use as `SUPABASE_ANON_KEY` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`), **Secret** key (server-only; use as `SUPABASE_SERVICE_ROLE_KEY`), and **JWT Secret** (Settings → API → JWT Settings). Supabase may still show legacy labels “anon” and “service_role” for the same keys.
+5. **Settings → API**: Note **Project URL**, **Publishable** key (client-safe; use as `SUPABASE_ANON_KEY` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`), and **Secret** key (server-only; use as `SUPABASE_SERVICE_ROLE_KEY`). Supabase may still show legacy labels “anon” and “service_role” for the same keys.
+6. Backend JWT verification uses Supabase **Signing Keys (JWKS)** at `https://<project-ref>.supabase.co/auth/v1/.well-known/jwks.json`, so no backend `SUPABASE_JWT_SECRET` is required.
 
 ## 2. Gemini API key
 
@@ -91,7 +92,6 @@ This doc covers deploying the app for production (Vercel + Cloud Run + Supabase 
    echo -n "YOUR_GEMINI_API_KEY" | gcloud secrets create gemini-api-key --data-file=-
    echo -n "https://YOUR_PROJECT_REF.supabase.co" | gcloud secrets create supabase-url --data-file=-
    echo -n "YOUR_SUPABASE_SECRET_KEY" | gcloud secrets create supabase-service-key --data-file=-
-   echo -n "YOUR_SUPABASE_JWT_SECRET" | gcloud secrets create supabase-jwt-secret --data-file=-
    ```
    If a secret already exists, use `gcloud secrets versions add gemini-api-key --data-file=-` (and similar) to add a new version instead of `create`.
 5. **Deploy** the service (this **creates** it; run from your project root where the Dockerfile lives):
@@ -101,7 +101,7 @@ This doc covers deploying the app for production (Vercel + Cloud Run + Supabase 
      --region us-central1 \
      --allow-unauthenticated \
      --set-env-vars "DEFAULT_AI_PROVIDER=gemini" \
-     --set-secrets "GEMINI_API_KEY=gemini-api-key:latest,SUPABASE_URL=supabase-url:latest,SUPABASE_SERVICE_ROLE_KEY=supabase-service-key:latest,SUPABASE_JWT_SECRET=supabase-jwt-secret:latest" \
+      --set-secrets "GEMINI_API_KEY=gemini-api-key:latest,SUPABASE_URL=supabase-url:latest,SUPABASE_SERVICE_ROLE_KEY=supabase-service-key:latest" \
      --memory 512Mi --cpu 1 --timeout 300 --min-instances 0 --max-instances 3
    ```
    The first run builds the image and creates the service. Note the URL (e.g. `https://benchmarked-api-xxxxx-uc.a.run.app`).

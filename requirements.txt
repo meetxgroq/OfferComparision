@@ -43,6 +43,6 @@ mkdocs-material>=9.0.0
 fastapi>=0.111.0
 uvicorn[standard]>=0.30.0
 
-# Auth and rate limiting (Supabase). PyJWT installs as 'jwt' (import jwt).
+# Auth and rate limiting (Supabase)
 supabase>=2.0.0
-PyJWT>=2.8.0
+python-jose[cryptography]>=3.3.0
