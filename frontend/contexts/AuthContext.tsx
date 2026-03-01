@@ -52,7 +52,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [supabase])
 
   const signInWithGoogle = useCallback(async () => {
-    if (supabase) await supabase.auth.signInWithOAuth({ provider: 'google' })
+    if (!supabase) return
+    const redirectTo = typeof window !== 'undefined' ? `${window.location.origin}/` : undefined
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo },
+    })
   }, [supabase])
 
   const signOut = useCallback(async () => {
@@ -61,8 +66,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const getAccessToken = useCallback(async () => {
     if (!supabase) return null
-    const { data: { session } } = await supabase.auth.getSession()
-    return session?.access_token ?? null
+    // Refresh session so we get a valid access_token (Supabase JWTs expire ~1hr; getSession() can return expired)
+    const { data, error } = await supabase.auth.refreshSession()
+    if (error || !data.session) {
+      if (error?.message?.includes('refresh') || error?.message?.includes('expired')) {
+        await supabase.auth.signOut()
+      }
+      return null
+    }
+    return data.session.access_token
   }, [supabase])
 
   const value: AuthContextType = {

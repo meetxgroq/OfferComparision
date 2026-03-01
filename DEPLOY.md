@@ -2,6 +2,54 @@
 
 This doc covers deploying the app for production (Vercel + Cloud Run + Supabase + Gemini). For local setup see [SETUP_GUIDE.md](SETUP_GUIDE.md) and [.env.example](.env.example).
 
+---
+
+## Deploy Cloud Run right now (step-by-step)
+
+**Do you need to commit, push, and clone?** It depends **where** you run the deploy command:
+
+| Where you run `gcloud run deploy --source .` | Need to push & clone? |
+|---------------------------------------------|------------------------|
+| **Your laptop** (with gcloud CLI installed)   | **No.** Run from your repo folder. The CLI uploads that folder to Cloud Build. |
+| **Google Cloud Shell** (browser)            | **Yes.** Cloud Shell has no copy of your code. Push to GitHub, then clone the repo in Cloud Shell and run deploy from the cloned folder. |
+
+### Option A: Deploy from your laptop
+
+1. Install [Google Cloud SDK](https://cloud.google.com/sdk/docs/install) and run `gcloud auth login` and `gcloud config set project YOUR_PROJECT_ID`.
+2. In a terminal, go to your **repo root** (the folder that contains `Dockerfile`, `api_server.py`, `requirements.txt`):
+   ```bash
+   cd /path/to/OfferComparision
+   ```
+3. Follow **Step 3** below (create secrets, then run the deploy command from this folder). No commit/push or clone needed.
+
+### Option B: Deploy from Google Cloud Shell
+
+1. **Commit and push** your code to GitHub (so Cloud Shell can clone it):
+   ```bash
+   git add .
+   git commit -m "Deploy to Cloud Run"
+   git push origin main
+   ```
+2. Open [Google Cloud Console](https://console.cloud.google.com/) → select your project → click **Activate Cloud Shell** (terminal icon in the top bar).
+3. **Clone the repo** and go into it:
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git
+   cd YOUR_REPO_NAME
+   ```
+   (Use your real GitHub URL; if the repo is private, use a personal access token or SSH.)
+4. In Cloud Shell you are already authenticated. Set region and enable APIs (see Step 3 below), create secrets, then run the **deploy** command from this cloned folder (`--source .` will use the current directory).
+
+### Order of steps (same for A or B)
+
+1. Have a GCP project with billing enabled.
+2. Set region: `gcloud config set run/region us-central1`
+3. Enable APIs: `gcloud services enable run.googleapis.com artifactregistry.googleapis.com cloudbuild.googleapis.com`
+4. Create the four secrets in Secret Manager (see Step 3 in the section below).
+5. From the **folder that contains the backend** (repo root with `Dockerfile`), run the `gcloud run deploy benchmarked-api ...` command.
+6. Copy the Cloud Run URL and use it for the frontend (Vercel) and CORS.
+
+---
+
 ## Prerequisites
 
 - GitHub repo with code
@@ -14,8 +62,11 @@ This doc covers deploying the app for production (Vercel + Cloud Run + Supabase 
 
 1. Create a project at [supabase.com](https://supabase.com).
 2. **Authentication → Providers → Google**: Enable Google, create OAuth credentials in [Google Cloud Console](https://console.cloud.google.com/apis/credentials) (Web application, redirect URI `https://<project-ref>.supabase.co/auth/v1/callback`), paste Client ID and Secret.
-3. **SQL Editor**: Run the migration [supabase/migrations/001_user_usage.sql](supabase/migrations/001_user_usage.sql).
-4. **Settings → API**: Note **Project URL**, **Publishable** key (client-safe; use as `SUPABASE_ANON_KEY` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`), **Secret** key (server-only; use as `SUPABASE_SERVICE_ROLE_KEY`), and **JWT Secret** (Settings → API → JWT Settings). Supabase may still show legacy labels “anon” and “service_role” for the same keys.
+3. **Authentication → URL Configuration** (required so production doesn’t redirect to localhost after Google Sign-In):
+   - **Site URL**: your production URL, e.g. `https://benchmarked-ashen.vercel.app`
+   - **Redirect URLs**: add `http://localhost:3000/**`, `http://localhost:3001/**`, `https://benchmarked-ashen.vercel.app/**`, and `https://*.vercel.app/**`
+4. **SQL Editor**: Run the migration [supabase/migrations/001_user_usage.sql](supabase/migrations/001_user_usage.sql).
+5. **Settings → API**: Note **Project URL**, **Publishable** key (client-safe; use as `SUPABASE_ANON_KEY` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`), **Secret** key (server-only; use as `SUPABASE_SERVICE_ROLE_KEY`), and **JWT Secret** (Settings → API → JWT Settings). Supabase may still show legacy labels “anon” and “service_role” for the same keys.
 
 ## 2. Gemini API key
 
