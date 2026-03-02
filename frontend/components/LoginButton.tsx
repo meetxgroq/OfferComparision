@@ -1,9 +1,21 @@
 'use client'
 
+import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 
 export default function LoginButton() {
   const { signInWithGoogle, loading } = useAuth()
+  const [authError, setAuthError] = useState<string | null>(null)
+
+  const handleSignIn = async () => {
+    setAuthError(null)
+    try {
+      await signInWithGoogle()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Google sign-in failed. Check Supabase Google OAuth redirect URLs for your localhost port.'
+      setAuthError(message)
+    }
+  }
 
   if (loading) {
     return (
@@ -22,7 +34,7 @@ export default function LoginButton() {
         You get 2 free comparisons per day. Sign in with Google to continue.
       </p>
       <button
-        onClick={() => signInWithGoogle()}
+        onClick={handleSignIn}
         className="flex items-center gap-3 px-6 py-3 bg-white text-slate-900 rounded-xl font-semibold hover:bg-slate-100 transition-colors shadow-lg"
       >
         <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -45,6 +57,11 @@ export default function LoginButton() {
         </svg>
         Sign in with Google
       </button>
+      {authError && (
+        <p className="text-sm text-red-300 text-center max-w-md">
+          {authError}
+        </p>
+      )}
     </div>
   )
 }

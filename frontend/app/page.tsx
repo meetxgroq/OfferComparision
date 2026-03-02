@@ -9,6 +9,7 @@ import {
   ChartBarIcon,
   SparklesIcon,
   CloudArrowUpIcon,
+  EnvelopeIcon,
   XMarkIcon,
   AdjustmentsHorizontalIcon,
   ArrowRightIcon,
@@ -288,6 +289,14 @@ export default function OfferComparePage() {
                   <p className="text-xs text-slate-400 font-medium tracking-wider">INTELLIGENT CAREER ANALYSIS</p>
                 </div>
               </div>
+              <a
+                href="mailto:meetxgroq@gmail.com"
+                className="text-slate-400 hover:text-cyan-400 transition-colors p-2"
+                title="Contact Us"
+                aria-label="Contact Us"
+              >
+                <EnvelopeIcon className="h-5 w-5" />
+              </a>
             </div>
           </div>
         </header>
@@ -328,6 +337,14 @@ export default function OfferComparePage() {
               <span className="text-slate-500 text-sm truncate max-w-[120px]" title={user?.email ?? ''}>
                 {user?.email ?? ''}
               </span>
+              <a
+                href="mailto:meetxgroq@gmail.com"
+                className="text-slate-400 hover:text-cyan-400 transition-colors p-2"
+                title="Contact Us"
+                aria-label="Contact Us"
+              >
+                <EnvelopeIcon className="h-5 w-5" />
+              </a>
               <button
                 onClick={() => signOut()}
                 className="text-slate-400 hover:text-cyan-400 transition-colors p-2"
