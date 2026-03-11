@@ -74,6 +74,29 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
     fetchPositions();
   }, []);
 
+  // Location Autocomplete State
+  const [locationSuggestions, setLocationSuggestions] = useState<string[]>([])
+  const [filteredLocations, setFilteredLocations] = useState<string[]>([])
+  const [showLocationSuggestions, setShowLocationSuggestions] = useState(false)
+
+  // Fetch locations on mount
+  useEffect(() => {
+    const fetchLocations = async () => {
+      try {
+        const res = await fetch('http://localhost:8001/api/locations');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.locations) {
+            setLocationSuggestions(data.locations);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to fetch locations", e);
+      }
+    };
+    fetchLocations();
+  }, []);
+
   const validateForm = useCallback(() => {
     const newErrors: Record<string, string> = {}
 
@@ -473,14 +496,64 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
 
                   <div>
                     <label className="block text-sm font-medium text-slate-300 mb-2">Location *</label>
-                    <input
-                      type="text"
-                      value={formData.location || ''}
-                      onChange={(e) => handleInputChange('location', e.target.value)}
-                      className={`w-full px-4 py-3 bg-white/5 border rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all ${errors.location ? 'border-red-500/50 focus:ring-red-500' : 'border-white/10 hover:border-white/20'
-                        }`}
-                      placeholder="e.g., San Francisco, CA"
-                    />
+                    <div className="relative group">
+                      <input
+                        type="text"
+                        value={formData.location || ''}
+                        onChange={(e) => {
+                          const val = e.target.value
+                          handleInputChange('location', val)
+                          if (val.trim().length > 0) {
+                            const matches = locationSuggestions.filter(l => l.toLowerCase().includes(val.toLowerCase()))
+                            setFilteredLocations(matches)
+                            setShowLocationSuggestions(true)
+                          } else {
+                            setShowLocationSuggestions(false)
+                          }
+                        }}
+                        onFocus={() => {
+                          if (locationSuggestions.length > 0 && formData.location) {
+                            const matches = locationSuggestions.filter(l => l.toLowerCase().includes(formData.location!.toLowerCase()))
+                            setFilteredLocations(matches)
+                            setShowLocationSuggestions(true)
+                          } else if (locationSuggestions.length > 0 && !formData.location) {
+                            setFilteredLocations(locationSuggestions)
+                            setShowLocationSuggestions(true)
+                          }
+                        }}
+                        onBlur={() => setTimeout(() => setShowLocationSuggestions(false), 200)}
+                        className={`w-full px-4 py-3 bg-white/5 border rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all ${errors.location ? 'border-red-500/50 focus:ring-red-500' : 'border-white/10 hover:border-white/20'
+                          }`}
+                        placeholder="e.g., San Francisco, CA"
+                        autoComplete="off"
+                      />
+                      {/* Location Suggestions Dropdown */}
+                      {showLocationSuggestions && filteredLocations.length > 0 && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="absolute z-50 left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-xl shadow-xl overflow-hidden max-h-60 overflow-y-auto custom-scrollbar ring-1 ring-white/5"
+                        >
+                          <div className="px-3 py-2 text-[10px] uppercase font-bold text-slate-500 border-b border-white/5">
+                            Common Locations
+                          </div>
+                          {filteredLocations.map((loc) => (
+                            <button
+                              key={loc}
+                              type="button"
+                              className="w-full text-left px-4 py-3 text-sm text-slate-300 hover:text-white hover:bg-cyan-500/10 transition-colors"
+                              onMouseDown={(e) => {
+                                e.preventDefault()
+                                handleInputChange('location', loc)
+                                setShowLocationSuggestions(false)
+                              }}
+                            >
+                              {loc}
+                            </button>
+                          ))}
+                        </motion.div>
+                      )}
+                    </div>
                     {errors.location && <p className="mt-1 text-sm text-red-400">{errors.location}</p>}
                   </div>
 

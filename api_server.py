@@ -131,6 +131,13 @@ def get_positions() -> Dict[str, List[str]]:
     """Get all common position suggestions."""
     return {"positions": get_all_positions()}
 
+from utils.locations import get_all_locations
+
+@app.get("/api/locations", response_model=Dict[str, List[str]])
+def get_locations() -> Dict[str, List[str]]:
+    """Get all supported location suggestions."""
+    return {"locations": get_all_locations()}
+
 
 @app.get("/api/usage")
 def get_usage(authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
