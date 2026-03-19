@@ -83,7 +83,7 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
   useEffect(() => {
     const fetchLocations = async () => {
       try {
-        const res = await fetch('http://localhost:8001/api/locations');
+        const res = await fetch(`${getApiBase()}/api/locations`);
         if (res.ok) {
           const data = await res.json();
           if (data.locations) {
