@@ -41,6 +41,7 @@ from pocketflow import Flow, AsyncFlow
 from utils.call_llm import get_provider_info
 from utils.currency import get_all_currencies, infer_currency
 from utils.country_data import get_all_countries, infer_country
+from utils.offers_db import list_offers, upsert_offers, delete_offer, delete_offer_by_client_id
 
 
 class Offer(BaseModel):
@@ -83,6 +84,41 @@ class AnalyzeResponse(BaseModel):
     comparison_results: Dict[str, Any]
     visualization_data: Dict[str, Any]
     offers: List[Dict[str, Any]]
+
+
+class SaveOffersRequest(BaseModel):
+    offers: List[Offer] = Field(default_factory=list)
+
+
+class SavedOfferResponse(BaseModel):
+    id: str
+    client_id: Optional[str] = None
+    company: str
+    position: str
+    location: str
+    base_salary: float
+    equity: float = 0
+    bonus: float = 0
+    signing_bonus: Optional[float] = 0
+    total_compensation: Optional[float] = None
+    years_experience: Optional[int] = None
+    vesting_years: Optional[int] = 4
+    level: Optional[str] = None
+    benefits_grade: Optional[str] = None
+    wlb_grade: Optional[str] = None
+    growth_grade: Optional[str] = None
+    wlb_score: Optional[float] = None
+    growth_score: Optional[float] = None
+    work_type: Optional[str] = None
+    employment_type: Optional[str] = None
+    domain: Optional[str] = None
+    job_description: Optional[str] = None
+    other_perks: Optional[str] = None
+    relocation_support: Optional[bool] = None
+    currency: Optional[str] = None
+    country: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
 
 
 app = FastAPI(title="BenchMarked API", version="1.0.0")
@@ -306,6 +342,35 @@ async def analyze_quick(
         visualization_data=result.get("visualization_data", {}),
         offers=result.get("offers", []),
     )
+
+
+@app.get("/api/offers", response_model=List[SavedOfferResponse])
+async def get_offers(user_id: str = Depends(verify_jwt)):
+    """Fetch all saved offers for the authenticated user."""
+    return list_offers(user_id)
+
+
+@app.post("/api/offers", response_model=List[SavedOfferResponse])
+async def save_offers(req: SaveOffersRequest, user_id: str = Depends(verify_jwt)):
+    """Upsert (save/update) offers for the authenticated user."""
+    if not req.offers:
+        raise HTTPException(status_code=400, detail="Offers list cannot be empty")
+    offer_dicts = []
+    for o in req.offers:
+        d = o.model_dump()
+        d["client_id"] = d.pop("id", None)
+        offer_dicts.append(d)
+    return upsert_offers(user_id, offer_dicts)
+
+
+@app.delete("/api/offers/{offer_id}")
+async def remove_offer(offer_id: str, by: str = "id", user_id: str = Depends(verify_jwt)):
+    """Delete a saved offer by Supabase UUID (default) or by client_id (?by=client_id)."""
+    if by == "client_id":
+        delete_offer_by_client_id(user_id, offer_id)
+    else:
+        delete_offer(user_id, offer_id)
+    return {"status": "deleted"}
 
 
 if __name__ == "__main__":

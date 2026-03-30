@@ -55,7 +55,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!supabase) {
       throw new Error('Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in frontend/.env.local and restart the frontend.')
     }
-    const redirectTo = typeof window !== 'undefined' ? `${window.location.origin}/` : undefined
+    const redirectTo = typeof window !== 'undefined'
+      ? `${window.location.origin}/auth/callback`
+      : undefined
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo },
@@ -72,13 +74,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const getAccessToken = useCallback(async () => {
     if (!supabase) return null
-    // Refresh session so we get a valid access_token (Supabase JWTs expire ~1hr; getSession() can return expired)
+
+    const { data: { session: current } } = await supabase.auth.getSession()
+    if (!current) return null
+
+    const expiresAt = current.expires_at ?? 0
+    const nowSec = Math.floor(Date.now() / 1000)
+    const bufferSec = 60
+
+    if (expiresAt - nowSec > bufferSec) {
+      return current.access_token
+    }
+
     const { data, error } = await supabase.auth.refreshSession()
     if (error || !data.session) {
-      if (error?.message?.includes('refresh') || error?.message?.includes('expired')) {
-        await supabase.auth.signOut()
-      }
-      return null
+      return current.access_token
     }
     return data.session.access_token
   }, [supabase])

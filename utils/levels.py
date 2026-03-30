@@ -283,7 +283,7 @@ async def infer_level_async(company: str, level_str: str, position: str = "Softw
         if not response_json:
             return None
             
-        data = json.loads(response_json)
+        data = json.loads(response_json, strict=False)
         level = data.get("universal_level")
         if isinstance(level, int) and 1 <= level <= 9:
             return level

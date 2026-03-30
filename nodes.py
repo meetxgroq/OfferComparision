@@ -938,7 +938,7 @@ class AIAnalysisNode(AsyncNode):
                     if clean_str.endswith("```"):
                         clean_str = clean_str.rsplit("\n", 1)[0]
                 
-                analysis_res = json.loads(clean_str)
+                analysis_res = json.loads(clean_str, strict=False)
                 
                 # Ensure growth content is present, fallback to local generation if missing
                 if not analysis_res.get("growth_description") or not analysis_res.get("growth_points"):
@@ -1727,7 +1727,7 @@ class QuickAIAnalysisNode(AsyncNode):
             
             # Parse JSON response and sanitize for cross-platform JSON (no control chars)
             if isinstance(structured_response, str):
-                analysis_data = json.loads(structured_response)
+                analysis_data = json.loads(structured_response, strict=False)
             else:
                 analysis_data = structured_response
             analysis_data = sanitize_for_json(analysis_data)

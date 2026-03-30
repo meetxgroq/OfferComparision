@@ -109,7 +109,7 @@ def research_company(company_name, position=None, research_topics=None):
                 response_format={"type": "json_object"},
                 system_prompt="You are a data analyst extracting structured metrics from company research."
             )
-        metrics = json.loads(metrics_json)
+        metrics = json.loads(metrics_json, strict=False)
     except:
         # Fallback to default scores if parsing fails
         metrics = {

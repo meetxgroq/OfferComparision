@@ -18,6 +18,7 @@ import {
 
 import { useAuth } from '@/contexts/AuthContext'
 import { getApiBase, authHeaders } from '@/lib/api'
+import { fetchSavedOffers, saveOffersToCloud, deleteOfferFromCloud } from '@/lib/offers-api'
 import LoginButton from '@/components/LoginButton'
 import ProfileManager from '@/components/ProfileManager'
 import AdvancedOfferForm from '@/components/AdvancedOfferForm'
@@ -49,6 +50,8 @@ export default function OfferComparePage() {
   const [modalVersion, setModalVersion] = useState(0)
   const [comparisonCurrency, setComparisonCurrency] = useState<string>('USD')
   const [currentCountry, setCurrentCountry] = useState<string>('')
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle')
+  const saveTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   // Load data from localStorage on component mount
   useEffect(() => {
@@ -116,6 +119,57 @@ export default function OfferComparePage() {
     }
   }, [selectedOffers])
 
+  useEffect(() => {
+    if (!user) {
+      setCloudSyncStatus('idle')
+      return
+    }
+    let cancelled = false
+    const syncFromCloud = async () => {
+      try {
+        setCloudSyncStatus('syncing')
+        const token = await getAccessToken()
+        if (!token || cancelled) return
+        const cloudOffers = await fetchSavedOffers(token)
+        if (cancelled) return
+
+        setOffers(prev => {
+          const localIds = new Set(prev.map(o => o.id))
+          const newFromCloud = cloudOffers
+            .filter(co => !localIds.has(co.client_id || co.id))
+            .map(co => ({ ...co, id: co.client_id || co.id } as any))
+          if (newFromCloud.length === 0) return prev
+          return [...prev, ...newFromCloud]
+        })
+        setCloudSyncStatus('synced')
+      } catch (e) {
+        console.error('Cloud sync failed:', e)
+        setCloudSyncStatus('error')
+      }
+    }
+    syncFromCloud()
+    return () => { cancelled = true }
+  }, [user])
+
+  useEffect(() => {
+    if (!user || offers.length === 0) return
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = setTimeout(async () => {
+      try {
+        const token = await getAccessToken()
+        if (!token) return
+        await saveOffersToCloud(token, offers)
+        setCloudSyncStatus('synced')
+      } catch (e) {
+        console.error('Cloud save failed:', e)
+        setCloudSyncStatus('error')
+      }
+    }, 2000)
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    }
+  }, [offers, user])
+
   // Re-run analysis when comparison currency changes (if results already exist)
   const runAnalysisRef = useRef<(() => void) | null>(null)
   useEffect(() => {
@@ -143,7 +197,12 @@ export default function OfferComparePage() {
   const handleRemoveOffer = useCallback((offerId: string) => {
     setOffers(prev => prev.filter(offer => offer.id !== offerId))
     setSelectedOffers(prev => prev.filter(id => id !== offerId))
-  }, [])
+    if (user) {
+      getAccessToken().then(token => {
+        if (token) deleteOfferFromCloud(token, offerId).catch(console.error)
+      })
+    }
+  }, [user, getAccessToken])
 
   const handleToggleSelection = useCallback((offerId: string) => {
     // Clear any previous errors when interacting with selection
@@ -447,6 +506,17 @@ export default function OfferComparePage() {
                 <span className="w-2 h-8 bg-gradient-to-b from-cyan-400 to-blue-600 rounded-full block"></span>
                 Your Job Offers
               </h2>
+              {user && cloudSyncStatus !== 'idle' && (
+                <span className={`text-xs px-2 py-0.5 rounded-full ml-3 ${
+                  cloudSyncStatus === 'syncing' ? 'bg-yellow-500/20 text-yellow-400' :
+                  cloudSyncStatus === 'synced' ? 'bg-green-500/20 text-green-400' :
+                  'bg-red-500/20 text-red-400'
+                }`}>
+                  {cloudSyncStatus === 'syncing' ? 'Syncing...' :
+                   cloudSyncStatus === 'synced' ? 'Saved to cloud' :
+                   'Sync failed'}
+                </span>
+              )}
               <p className="text-slate-400 mt-2 ml-5">Compare your opportunities side-by-side.</p>
             </div>
 
