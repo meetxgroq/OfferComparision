@@ -12,44 +12,61 @@ interface PreferencesPanelProps {
   onClose: () => void
 }
 
+type WeightKey =
+  | 'salary_weight'
+  | 'equity_weight'
+  | 'wlb_weight'
+  | 'growth_weight'
+  | 'culture_weight'
+  | 'benefits_weight'
+
+const WEIGHT_KEYS: WeightKey[] = [
+  'salary_weight',
+  'equity_weight',
+  'wlb_weight',
+  'growth_weight',
+  'culture_weight',
+  'benefits_weight',
+]
+
 const PREFERENCE_DEFINITIONS = [
   {
-    key: 'salary_weight' as keyof UserPreferences,
+    key: 'salary_weight' as WeightKey,
     label: 'Base Salary',
     description: 'Weight of base salary in your decision',
     color: 'green' as const,
     icon: '💰'
   },
   {
-    key: 'equity_weight' as keyof UserPreferences,
+    key: 'equity_weight' as WeightKey,
     label: 'Equity/Stock',
     description: 'Weight of equity value and potential',
     color: 'purple' as const,
     icon: '📈'
   },
   {
-    key: 'wlb_weight' as keyof UserPreferences,
+    key: 'wlb_weight' as WeightKey,
     label: 'Work-Life Balance',
     description: 'Weight of work-life balance quality',
     color: 'blue' as const,
     icon: '⚖️'
   },
   {
-    key: 'growth_weight' as keyof UserPreferences,
+    key: 'growth_weight' as WeightKey,
     label: 'Growth Opportunity',
     description: 'Weight of career advancement potential',
     color: 'green' as const,
     icon: '🚀'
   },
   {
-    key: 'culture_weight' as keyof UserPreferences,
+    key: 'culture_weight' as WeightKey,
     label: 'Company Culture',
     description: 'Weight of company culture and values',
     color: 'purple' as const,
     icon: '🏢'
   },
   {
-    key: 'benefits_weight' as keyof UserPreferences,
+    key: 'benefits_weight' as WeightKey,
     label: 'Benefits Package',
     description: 'Weight of health, PTO, and other benefits',
     color: 'blue' as const,
@@ -118,15 +135,16 @@ export default function PreferencesPanel({ preferences, onSave, onClose }: Prefe
   const [localPreferences, setLocalPreferences] = useState<UserPreferences>(preferences)
   const [activeTab, setActiveTab] = useState<'quick' | 'custom'>('quick')
 
-  // Normalize weights to ensure they sum to 1.0
+  // Normalize weights to ensure they sum to 1.0 (numeric keys only; e.g. current_country unchanged)
   const normalizeWeights = (weights: UserPreferences): UserPreferences => {
-    const total = Object.values(weights).reduce((sum, value) => sum + value, 0)
+    const total = WEIGHT_KEYS.reduce((sum, key) => sum + weights[key], 0)
     if (total === 0) return weights
 
-    return Object.keys(weights).reduce((normalized, key) => {
-      normalized[key as keyof UserPreferences] = weights[key as keyof UserPreferences] / total
-      return normalized
-    }, {} as UserPreferences)
+    const next = { ...weights }
+    for (const key of WEIGHT_KEYS) {
+      next[key] = weights[key] / total
+    }
+    return next
   }
 
   // Auto-normalization removed to prevent slider check fighting
@@ -134,7 +152,7 @@ export default function PreferencesPanel({ preferences, onSave, onClose }: Prefe
   //   setLocalPreferences(normalizeWeights(localPreferences))
   // }, [localPreferences])
 
-  const handleWeightChange = (key: keyof UserPreferences, value: number) => {
+  const handleWeightChange = (key: WeightKey, value: number) => {
     // Direct update without immediate normalization
     setLocalPreferences(prev => ({
       ...prev,
@@ -143,7 +161,7 @@ export default function PreferencesPanel({ preferences, onSave, onClose }: Prefe
   }
 
   const handlePresetSelect = (preset: typeof PRESET_PROFILES[0]) => {
-    setLocalPreferences(preset.weights)
+    setLocalPreferences((prev) => ({ ...prev, ...preset.weights }))
   }
 
   const handleSave = () => {
@@ -158,7 +176,7 @@ export default function PreferencesPanel({ preferences, onSave, onClose }: Prefe
     }
   }
 
-  const totalWeight = Object.values(localPreferences).reduce((sum, value) => sum + value, 0)
+  const totalWeight = WEIGHT_KEYS.reduce((sum, key) => sum + localPreferences[key], 0)
 
   return (
     <motion.div
@@ -239,8 +257,8 @@ export default function PreferencesPanel({ preferences, onSave, onClose }: Prefe
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {PRESET_PROFILES.map((preset) => {
-                  const isSelected = Object.keys(preset.weights).every(
-                    (key) => Math.abs(preset.weights[key as keyof UserPreferences] - localPreferences[key as keyof UserPreferences]) < 0.001
+                  const isSelected = WEIGHT_KEYS.every(
+                    (key) => Math.abs(preset.weights[key] - localPreferences[key]) < 0.001
                   )
 
                   return (

@@ -6,9 +6,9 @@ This script allows you to easily switch between the real API server (with Gemini
 and the mock API server for development.
 
 Usage:
-  python start_server.py --real     # Start real API server with Gemini
-  python start_server.py --mock     # Start mock API server
-  python start_server.py            # Auto-detect based on API quota
+  python scripts/start_server.py --real     # Start real API server with Gemini
+  python scripts/start_server.py --mock     # Start mock API server
+  python scripts/start_server.py            # Auto-detect based on API quota
 """
 
 import argparse
@@ -17,6 +17,9 @@ import sys
 import requests
 import os
 from pathlib import Path
+
+PROJECT_DIR = Path(__file__).resolve().parent.parent
+SCRIPT_DIR = Path(__file__).resolve().parent
 
 def check_gemini_quota():
     """Check if Gemini API is available and within quota."""
@@ -50,7 +53,7 @@ def start_real_server():
         load_dotenv()
     
     # Start the real server
-    subprocess.run([sys.executable, "api_server.py"])
+    subprocess.run([sys.executable, str(PROJECT_DIR / "api_server.py")])
 
 def start_mock_server():
     """Start the mock API server for development."""
@@ -59,7 +62,7 @@ def start_mock_server():
     print("🎭 Using mock data for development")
     print("⚡ Fast responses without API calls")
     print("")
-    subprocess.run([sys.executable, "mock_api_server.py"])
+    subprocess.run([sys.executable, str(SCRIPT_DIR / "mock_api_server.py")])
 
 def main():
     parser = argparse.ArgumentParser(description="Start OfferCompare Pro API server")

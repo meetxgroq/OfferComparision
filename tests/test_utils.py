@@ -81,6 +81,17 @@ class TestCallLLM:
         assert gemini_models[0] == "gemini-3-flash-preview"
 
 
+def test_international_tax_rates():
+    from utils.tax_calculator import estimate_tax_rate
+
+    rate = estimate_tax_rate("Bangalore, India")
+    assert 0.25 <= rate <= 0.35
+    rate = estimate_tax_rate("Dubai, UAE")
+    assert rate == 0.0
+    rate = estimate_tax_rate("Seoul, South Korea")
+    assert 0.25 <= rate <= 0.40
+
+
 class TestCOLCalculator:
     """Test cost of living calculation functions."""
     

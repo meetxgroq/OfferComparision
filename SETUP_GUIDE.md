@@ -14,7 +14,7 @@ OfferCompare Pro now supports **multiple AI providers** including Google Gemini 
 ### 2. Set Up Environment
 ```bash
 # Option A: Automated Setup (Recommended)
-python setup_local.py
+python scripts/setup_local.py
 
 # Option B: Manual Setup
 cp .env.example .env
@@ -127,7 +127,7 @@ OfferCompare Pro automatically falls back to other providers if your primary cho
 
 ### Run the guided setup:
 ```bash
-python setup_local.py
+python scripts/setup_local.py
 ```
 
 ### Check configuration:

@@ -9,6 +9,7 @@ import {
   PencilSquareIcon
 } from '@heroicons/react/24/outline'
 import { Offer } from '@/types'
+import { formatCurrency, formatCurrencyPair, convertCurrency } from '@/lib/currency'
 
 interface OfferCardsProps {
   offers: Offer[]
@@ -16,6 +17,7 @@ interface OfferCardsProps {
   onToggleSelection: (offerId: string) => void
   onRemoveOffer: (offerId: string) => void
   onEditOffer: (offer: Offer) => void
+  comparisonCurrency?: string
 }
 
 export default function OfferCards({
@@ -23,8 +25,11 @@ export default function OfferCards({
   selectedOffers,
   onToggleSelection,
   onRemoveOffer,
-  onEditOffer
+  onEditOffer,
+  comparisonCurrency
 }: OfferCardsProps) {
+  const cc = comparisonCurrency || 'USD'
+
   const getWorkTypeColor = (workType: string) => {
     switch (workType) {
       case 'remote': return 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
@@ -131,37 +136,111 @@ export default function OfferCards({
 
           {/* Compensation */}
           <div className="space-y-3 mb-6 bg-black/20 p-4 rounded-xl border border-white/5">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-400">Base Salary</span>
-              <span className="font-semibold text-white tracking-wide">
-                ${offer.base_salary.toLocaleString()}
-              </span>
-            </div>
+            {(() => {
+              const offerCur = offer.currency || 'USD'
+              const hasAnalysis = !!(offer as any).local_currency
+              const needsConversion = offerCur !== cc
 
-            {offer.equity > 0 && (
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-400">Equity</span>
-                <span className="font-medium text-slate-300">
-                  ${offer.equity.toLocaleString()}
-                </span>
-              </div>
-            )}
+              const showPair = (amount: number, normalizedOverride?: number) => {
+                if (hasAnalysis) {
+                  return formatCurrencyPair(
+                    amount,
+                    (offer as any).local_currency,
+                    normalizedOverride ?? amount,
+                    cc
+                  )
+                }
+                if (needsConversion) {
+                  return formatCurrencyPair(
+                    amount,
+                    offerCur,
+                    convertCurrency(amount, offerCur, cc),
+                    cc
+                  )
+                }
+                return formatCurrency(amount, offerCur)
+              }
 
-            {((offer.bonus || 0) > 0 || (offer.signing_bonus || 0) > 0) && (
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-400">Bonuses</span>
-                <span className="font-medium text-slate-300">
-                  ${((offer.bonus || 0) + (offer.signing_bonus || 0)).toLocaleString()}
-                </span>
-              </div>
-            )}
+              return (
+                <>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-slate-400">Base Salary</span>
+                    <span className="font-semibold text-white tracking-wide">
+                      {showPair(offer.base_salary, (offer as any).normalized_base_salary)}
+                    </span>
+                  </div>
 
-            <div className="flex items-center justify-between pt-3 border-t border-white/10 mt-2">
-              <span className="text-sm font-medium text-white/70">Total Comp</span>
-              <span className="font-bold text-lg text-gradient">
-                ${(offer.total_compensation || (offer.base_salary || 0) + (offer.equity || 0) + (offer.bonus || 0)).toLocaleString()}
-              </span>
-            </div>
+                  {offer.equity > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-slate-400">Equity</span>
+                      <span className="font-medium text-slate-300">
+                        {showPair(offer.equity, (offer as any).normalized_equity)}
+                      </span>
+                    </div>
+                  )}
+
+                  {((offer.bonus || 0) > 0 || (offer.signing_bonus || 0) > 0) && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-slate-400">Bonuses</span>
+                      <span className="font-medium text-slate-300">
+                        {(() => {
+                          const bonusTotal = (offer.bonus || 0) + (offer.signing_bonus || 0)
+                          if (hasAnalysis) {
+                            const normBonus =
+                              ((offer as any).normalized_bonus ?? offer.bonus ?? 0) +
+                              ((offer as any).normalized_signing_bonus ?? offer.signing_bonus ?? 0)
+                            return formatCurrencyPair(
+                              bonusTotal,
+                              (offer as any).local_currency,
+                              normBonus,
+                              cc
+                            )
+                          }
+                          if (needsConversion) {
+                            return formatCurrencyPair(
+                              bonusTotal,
+                              offerCur,
+                              convertCurrency(bonusTotal, offerCur, cc),
+                              cc
+                            )
+                          }
+                          return formatCurrency(bonusTotal, offerCur)
+                        })()}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between pt-3 border-t border-white/10 mt-2">
+                    <span className="text-sm font-medium text-white/70">Total Comp</span>
+                    <span className="font-bold text-lg text-gradient">
+                      {(() => {
+                        const total =
+                          offer.total_compensation ||
+                          (offer.base_salary || 0) + (offer.equity || 0) + (offer.bonus || 0)
+                        if (hasAnalysis) {
+                          const normTotal = (offer as any).normalized_total_compensation ?? total
+                          return formatCurrencyPair(
+                            total,
+                            (offer as any).local_currency,
+                            normTotal,
+                            cc
+                          )
+                        }
+                        if (needsConversion) {
+                          return formatCurrencyPair(
+                            total,
+                            offerCur,
+                            convertCurrency(total, offerCur, cc),
+                            cc
+                          )
+                        }
+                        return formatCurrency(total, offerCur)
+                      })()}
+                    </span>
+                  </div>
+                </>
+              )
+            })()}
           </div>
 
           {/* Ratings */}

@@ -264,8 +264,13 @@ def calculate_offer_score(offer_data, user_preferences=None, weights=None):
 
     # 9. Net Savings Score
     net_savings = offer_data.get("net_savings", 0)
-    # Scale: 0 -> 0, 100k -> 100
-    savings_score = min(100, max(0, (net_savings / 100000) * 100))
+    comparison_currency = offer_data.get("comparison_currency", "USD")
+    savings_reference = 100000  # USD baseline
+    if comparison_currency != "USD":
+        from utils.currency import convert_from_usd
+
+        savings_reference = convert_from_usd(100000, comparison_currency)
+    savings_score = min(100, max(0, (net_savings / savings_reference) * 100))
     factor_scores["net_savings"] = round(savings_score, 1)
     
     # Calculate weighted total score

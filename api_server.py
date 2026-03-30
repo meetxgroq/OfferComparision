@@ -39,6 +39,8 @@ from nodes import (
 )
 from pocketflow import Flow, AsyncFlow
 from utils.call_llm import get_provider_info
+from utils.currency import get_all_currencies, infer_currency
+from utils.country_data import get_all_countries, infer_country
 
 
 class Offer(BaseModel):
@@ -65,11 +67,14 @@ class Offer(BaseModel):
     job_description: Optional[str] = None
     other_perks: Optional[str] = None
     relocation_support: Optional[bool] = None
+    currency: Optional[str] = None  # ISO 4217 code; inferred from location if not provided
+    country: Optional[str] = None  # Inferred from location if not provided
 
 
 class AnalyzeRequest(BaseModel):
     offers: List[Offer] = Field(default_factory=list)
     user_preferences: Dict[str, Any] = Field(default_factory=dict)
+    comparison_currency: str = "USD"
 
 
 class AnalyzeResponse(BaseModel):
@@ -146,6 +151,18 @@ def get_usage(authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
     return get_usage_data(user_id)
 
 
+@app.get("/api/currencies")
+async def list_currencies():
+    """Return supported currencies with symbols and FX rates."""
+    return get_all_currencies()
+
+
+@app.get("/api/countries")
+async def list_countries():
+    """Return country profiles for relocation analysis UI."""
+    return get_all_countries()
+
+
 def _build_flow() -> AsyncFlow:
     market_research = MarketResearchNode()
     tax_calculation = TaxCalculationNode()
@@ -211,11 +228,16 @@ async def analyze(
         data["id"] = data.get("id") or f"offer_{i}"
         if data.get("total_compensation") is None:
             data["total_compensation"] = data.get("base_salary", 0) + data.get("equity", 0) + data.get("bonus", 0)
+        if not data.get("currency"):
+            data["currency"] = infer_currency(data.get("location", ""))
+        if not data.get("country"):
+            data["country"] = infer_country(data.get("location", ""))
         offers.append(data)
 
     shared = {
         "offers": offers,
         "user_preferences": req.user_preferences or {},
+        "comparison_currency": req.comparison_currency,
     }
 
     try:
@@ -259,11 +281,16 @@ async def analyze_quick(
         data["id"] = data.get("id") or f"offer_{i}"
         if data.get("total_compensation") is None:
             data["total_compensation"] = data.get("base_salary", 0) + data.get("equity", 0) + data.get("bonus", 0)
+        if not data.get("currency"):
+            data["currency"] = infer_currency(data.get("location", ""))
+        if not data.get("country"):
+            data["country"] = infer_country(data.get("location", ""))
         offers.append(data)
 
     shared = {
         "offers": offers,
         "user_preferences": req.user_preferences or {},
+        "comparison_currency": req.comparison_currency,
     }
 
     try:

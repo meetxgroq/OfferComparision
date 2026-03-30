@@ -41,6 +41,7 @@ import {
 } from 'chart.js'
 import ReactMarkdown from 'react-markdown'
 import type { AnalysisResults } from '@/types'
+import { formatCurrency, getCurrencySymbol } from '@/lib/currency'
 import VisualDashboard from './VisualDashboard'
 
 // Register Chart.js components
@@ -59,9 +60,26 @@ ChartJS.register(
 interface AnalysisResultsProps {
   results: AnalysisResults
   isDeepAnalysis?: boolean
+  comparisonCurrency?: string
 }
 
-export default function AnalysisResults({ results, isDeepAnalysis = false }: AnalysisResultsProps) {
+const NORMALIZED_KEYS: Record<string, string> = {
+  base_salary: 'normalized_base_salary',
+  equity: 'normalized_equity',
+  bonus: 'normalized_bonus',
+  total_compensation: 'normalized_total_compensation',
+}
+
+function getCompValue(offerData: any, key: string): number {
+  const normalizedKey = NORMALIZED_KEYS[key]
+  if (normalizedKey && offerData?.[normalizedKey] != null) {
+    return offerData[normalizedKey]
+  }
+  return offerData?.[key] || 0
+}
+
+export default function AnalysisResults({ results, isDeepAnalysis = false, comparisonCurrency }: AnalysisResultsProps) {
+  const cc = comparisonCurrency || 'USD'
   const [activeTab, setActiveTab] = useState<'ai' | 'charts' | 'table' | 'timeline'>('ai')
   const [selectedNegotiationOption, setSelectedNegotiationOption] = useState<string | null>(null)
   const [selectedNegotiationCompany, setSelectedNegotiationCompany] = useState<string | null>(null)
@@ -113,45 +131,47 @@ export default function AnalysisResults({ results, isDeepAnalysis = false }: Ana
   // Process data for charts
   const rankedOffers = results.comparison_results?.ranked_offers || []
 
-  // stack bar data
+  // stack bar data — use normalized values so cross-currency offers compare correctly
   const barData = {
     labels: rankedOffers.map(o => o.company),
     datasets: [
       {
         label: 'Base Salary',
-        data: rankedOffers.map(o => o.offer_data?.base_salary || 0),
+        data: rankedOffers.map(o => getCompValue(o.offer_data, 'base_salary')),
         backgroundColor: '#06b6d4', // cyan-500
         stack: 'Stack 0',
       },
       {
         label: 'Equity',
-        data: rankedOffers.map(o => o.offer_data?.equity || 0),
+        data: rankedOffers.map(o => getCompValue(o.offer_data, 'equity')),
         backgroundColor: '#fcd34d', // amber-300
         stack: 'Stack 0',
       },
       {
         label: 'Bonus',
-        data: rankedOffers.map(o => o.offer_data?.bonus || 0),
+        data: rankedOffers.map(o => getCompValue(o.offer_data, 'bonus')),
         backgroundColor: '#ef4444', // red-500
         stack: 'Stack 0',
       },
     ]
   }
 
-  // radar data
+  // radar data — use relative scaling so it works for any comparison currency
+  const maxSalary = Math.max(...rankedOffers.map(o => getCompValue(o.offer_data, 'base_salary')), 1)
+  const maxEquity = Math.max(...rankedOffers.map(o => getCompValue(o.offer_data, 'equity')), 1)
+  const maxBonus = Math.max(...rankedOffers.map(o => getCompValue(o.offer_data, 'bonus')), 1)
   const radarData = {
     labels: ['Salary', 'Equity', 'Bonus', 'Benefits', 'Work-Life', 'Growth', 'Overall'],
     datasets: rankedOffers.map((offer, index) => ({
       label: offer.company,
       data: [
-        // Normalize to 0-10 scale approximately
-        Math.min(10, (offer.offer_data?.base_salary || 0) / 25000),
-        Math.min(10, (offer.offer_data?.equity || 0) / 10000),
-        Math.min(10, (offer.offer_data?.bonus || 0) / 5000),
+        (getCompValue(offer.offer_data, 'base_salary') / maxSalary) * 10,
+        (getCompValue(offer.offer_data, 'equity') / maxEquity) * 10,
+        (getCompValue(offer.offer_data, 'bonus') / maxBonus) * 10,
         offer.offer_data?.benefits_grade === 'A+' ? 10 : offer.offer_data?.benefits_grade === 'A' ? 9 : 7,
         offer.offer_data?.wlb_score || 0,
         offer.offer_data?.growth_score || 0,
-        offer.total_score ? offer.total_score / 10 : 5 // Fallback
+        offer.total_score ? offer.total_score / 10 : 5
       ],
       backgroundColor: index === 0 ? 'rgba(6, 182, 212, 0.2)' : 'rgba(251, 146, 60, 0.2)',
       borderColor: index === 0 ? '#06b6d4' : '#fb923c',
@@ -293,16 +313,16 @@ export default function AnalysisResults({ results, isDeepAnalysis = false }: Ana
                       <h5 className="text-xs font-black text-slate-400 tracking-widest pl-1">Total Compensation</h5>
                       <div className="space-y-3">
                         {(() => {
-                          const maxVal = Math.max(...rankedOffers.map(o => o.offer_data?.total_compensation || 0), 1);
+                          const maxVal = Math.max(...rankedOffers.map(o => getCompValue(o.offer_data, 'total_compensation')), 1);
                           return rankedOffers.map((offer, idx) => {
-                            const val = offer.offer_data?.total_compensation || 0;
+                            const val = getCompValue(offer.offer_data, 'total_compensation');
                             const perc = (val / maxVal) * 100;
                             const isWinner = val === maxVal && val > 0;
                             return (
                               <div key={offer.offer_id} className="space-y-1.5">
                                 <div className="flex justify-between items-end px-1">
                                   <span className="text-sm font-bold text-white uppercase tracking-tighter">{offer.company}</span>
-                                  <span className="text-sm font-black text-white">${val.toLocaleString()}</span>
+                                  <span className="text-sm font-black text-white">{formatCurrency(val, cc)}</span>
                                 </div>
                                 <div className="h-3 w-full bg-slate-800 rounded-full overflow-hidden border border-white/5 shadow-inner">
                                   <motion.div
@@ -333,7 +353,7 @@ export default function AnalysisResults({ results, isDeepAnalysis = false }: Ana
                               <div key={offer.offer_id} className="space-y-1.5">
                                 <div className="flex justify-between items-end px-1">
                                   <span className="text-sm font-bold text-white uppercase tracking-tighter">{offer.company}</span>
-                                  <span className="text-sm font-black text-cyan-400">${val.toLocaleString()}<span className="text-[10px] text-slate-500 ml-1">/yr</span></span>
+                                  <span className="text-sm font-black text-cyan-400">{formatCurrency(val, cc)}<span className="text-[10px] text-slate-500 ml-1">/yr</span></span>
                                 </div>
                                 <div className="h-3 w-full bg-slate-800 rounded-full overflow-hidden border border-white/5 shadow-inner">
                                   <motion.div
@@ -490,15 +510,15 @@ export default function AnalysisResults({ results, isDeepAnalysis = false }: Ana
                             <span className="text-sm font-bold text-slate-300 group-hover:text-white transition-colors">{row.label}</span>
                           </td>
                           {rankedOffers.map(o => {
-                            const val = o.offer_data?.[row.key] || 0;
-                            const maxRowVal = Math.max(...rankedOffers.map(ro => ro.offer_data?.[row.key] || 0), 1);
+                            const val = getCompValue(o.offer_data, row.key);
+                            const maxRowVal = Math.max(...rankedOffers.map(ro => getCompValue(ro.offer_data, row.key)), 1);
                             const perc = (val / maxRowVal) * 100;
                             const isWinner = o.rank === 1;
                             return (
                               <td key={o.offer_id} className="py-5 px-6 text-right">
                                 <div className="inline-flex flex-col items-end w-full">
                                   <span className="text-[15px] font-black text-white mb-2 font-mono">
-                                    ${val.toLocaleString()}
+                                    {formatCurrency(val, cc)}
                                   </span>
                                   <div className="h-4 w-32 bg-slate-800 rounded-full overflow-hidden border border-white/5">
                                     <div
@@ -561,8 +581,9 @@ export default function AnalysisResults({ results, isDeepAnalysis = false }: Ana
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {rankedOffers.map((offer) => {
                     const percentile = offer.market_percentile || 50;
-                    const median = offer.market_median || (offer.offer_data?.total_compensation || 0) * 0.9;
-                    const current = offer.offer_data?.total_compensation || 0;
+                    const currentComp = getCompValue(offer.offer_data, 'total_compensation');
+                    const median = offer.market_median || currentComp * 0.9;
+                    const current = currentComp;
 
                     return (
                       <div key={offer.offer_id} className="bg-slate-900/60 rounded-3xl border border-white/5 p-6 hover:border-violet-500/30 transition-all group">
@@ -611,11 +632,11 @@ export default function AnalysisResults({ results, isDeepAnalysis = false }: Ana
                           <div className="flex justify-between items-center bg-slate-950/50 rounded-2xl p-4 border border-white/[0.03]">
                             <div className="text-center flex-1 border-r border-white/5">
                               <div className="text-xs font-bold text-slate-500 uppercase tracking-tighter mb-1">Your Offer</div>
-                              <div className="text-base font-black text-white">${current.toLocaleString()}</div>
+                              <div className="text-base font-black text-white">{formatCurrency(current, cc)}</div>
                             </div>
                             <div className="text-center flex-1">
                               <div className="text-xs font-bold text-slate-500 uppercase tracking-tighter mb-1">Median</div>
-                              <div className="text-base font-black text-slate-400">${median.toLocaleString()}</div>
+                              <div className="text-base font-black text-slate-400">{formatCurrency(median, cc)}</div>
                             </div>
                           </div>
                         </div>
@@ -997,6 +1018,42 @@ export default function AnalysisResults({ results, isDeepAnalysis = false }: Ana
               </div>
             )}
 
+            {results.final_report.relocation_analysis?.is_cross_country && (
+              <div className="mt-8 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-6">
+                <h3 className="text-xl font-bold mb-4 text-gray-800">🌍 Relocation Analysis</h3>
+                {results.final_report.relocation_analysis.transitions.map((t, i) => (
+                  <div key={i} className="bg-white rounded-lg p-6 mb-4 shadow-sm border border-gray-100">
+                    <h4 className="font-semibold text-lg mb-3 text-blue-700">
+                      {t.from_country} → {t.to_country}
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                      <div><span className="font-medium">Visa:</span> {t.visa_requirements}</div>
+                      <div><span className="font-medium">Tax:</span> {t.tax_comparison}</div>
+                      <div><span className="font-medium">Healthcare:</span> {t.healthcare}</div>
+                      <div><span className="font-medium">Quality of Life:</span> {t.quality_of_life}</div>
+                      <div><span className="font-medium">Career:</span> {t.career_ecosystem}</div>
+                      <div><span className="font-medium">Financial:</span> {t.financial_considerations}</div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 mt-4">
+                      <div>
+                        <h5 className="font-semibold text-green-600 mb-2">Pros</h5>
+                        <ul className="list-disc pl-4 text-sm space-y-1">
+                          {t.pros?.map((p, j) => <li key={j}>{p}</li>)}
+                        </ul>
+                      </div>
+                      <div>
+                        <h5 className="font-semibold text-red-600 mb-2">Cons</h5>
+                        <ul className="list-disc pl-4 text-sm space-y-1">
+                          {t.cons?.map((c, j) => <li key={j}>{c}</li>)}
+                        </ul>
+                      </div>
+                    </div>
+                    <p className="mt-3 italic text-gray-600 text-sm">{t.overall_recommendation}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* Visual Dashboard Loop */}
             {isDeepAnalysis && (
               <div className="space-y-8">
@@ -1095,7 +1152,8 @@ export default function AnalysisResults({ results, isDeepAnalysis = false }: Ana
                           grid: { color: 'rgba(255, 255, 255, 0.05)' },
                           ticks: {
                             color: '#94a3b8',
-                            callback: (value) => '$' + Number(value) / 1000 + 'k'
+                            callback: (value) =>
+                              `${getCurrencySymbol(cc)}${Number(value) / 1000}k`
                           }
                         }
                       },
@@ -1112,7 +1170,7 @@ export default function AnalysisResults({ results, isDeepAnalysis = false }: Ana
                                 label += ': ';
                               }
                               if (context.parsed.y !== null) {
-                                label += new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(context.parsed.y);
+                                label += formatCurrency(context.parsed.y, cc);
                               }
                               return label;
                             }
@@ -1182,9 +1240,9 @@ export default function AnalysisResults({ results, isDeepAnalysis = false }: Ana
                             )}
                           </td>
                           {rankedOffers.map(o => {
-                            const val = o.offer_data?.[row.key] || 0;
+                            const val = getCompValue(o.offer_data, row.key);
                             const display = row.format === 'currency'
-                              ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val)
+                              ? formatCurrency(val, cc)
                               : val;
                             return (
                               <td key={o.offer_id} className={`p-4 ${row.color}`}>

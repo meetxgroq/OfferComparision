@@ -51,7 +51,7 @@ def main():
         print("• Google Gemini: https://aistudio.google.com/app/apikey")
         print("• OpenAI: https://platform.openai.com/api-keys")
         print("• Anthropic Claude: https://console.anthropic.com/")
-        print("\nRun 'python setup_local.py' for guided setup.")
+        print("\nRun 'python scripts/setup_local.py' for guided setup.")
         print("\nYou can still explore the system features, but AI analysis will be limited.")
     else:
         print(f"\nAI Providers Available: {', '.join(available_providers)}")
@@ -245,7 +245,7 @@ TIPS FOR BEST RESULTS:
 
 🛠️ GETTING STARTED:
 If you haven't set up your environment yet:
-1. Run: python setup_local.py
+1. Run: python scripts/setup_local.py
 2. Follow the guided setup process
 3. Configure your API keys
 4. Return here and start your analysis!
@@ -302,7 +302,7 @@ def show_configuration():
     
     # Show setup options
     print(f"\n🔧 Setup Options:")
-    print("1. Run guided setup: python setup_local.py")
+    print("1. Run guided setup: python scripts/setup_local.py")
     print("2. Manual setup: Copy .env.example to .env and edit")
     print("3. Test configuration: Select 'Test Utilities' from main menu")
     

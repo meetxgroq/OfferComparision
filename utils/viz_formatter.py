@@ -129,11 +129,11 @@ def format_bar_chart(offers_data, metric="total_score"):
         title = "Overall Offer Scores"
         y_max = 100
     elif metric == "total_compensation":
-        data = [offer.get("offer_data", offer).get("total_compensation", 0) for offer in offers_data]
+        data = [offer.get("offer_data", offer).get("normalized_total_compensation", offer.get("offer_data", offer).get("total_compensation", 0)) for offer in offers_data]
         title = "Total Compensation Comparison"
         y_max = None
     elif metric == "base_salary":
-        data = [offer.get("offer_data", offer).get("base_salary", 0) for offer in offers_data]
+        data = [offer.get("offer_data", offer).get("normalized_base_salary", offer.get("offer_data", offer).get("base_salary", 0)) for offer in offers_data]
         title = "Base Salary Comparison"
         y_max = None
     else:
@@ -416,9 +416,9 @@ def format_comparison_table(offers_data):
             offer.get("position", "-"),
             offer.get("location", "-"),
             f"{offer.get('total_score', 0):.1f}",
-            f"${int(offer_data.get('base_salary', 0)):,}",
-            f"${int(offer_data.get('total_compensation', offer_data.get('base_salary', 0) + offer_data.get('equity', 0) + offer_data.get('bonus', 0))):,}",
-            f"${int(offer_data.get('equity', 0)):,}",
+            f"${int(offer_data.get('normalized_base_salary', offer_data.get('base_salary', 0))):,}",
+            f"${int(offer_data.get('normalized_total_compensation', offer_data.get('total_compensation', offer_data.get('base_salary', 0) + offer_data.get('equity', 0) + offer_data.get('bonus', 0)))):,}",
+            f"${int(offer_data.get('normalized_equity', offer_data.get('equity', 0))):,}",
             f"{scores.get('work_life_balance', 0):.0f}",
             f"{scores.get('career_growth', 0):.0f}",
             f"{scores.get('company_culture', 0):.0f}"

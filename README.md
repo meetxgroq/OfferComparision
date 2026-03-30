@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![OfferCompare Pro](./assets/banner.png)
+![OfferCompare Pro](./assets/banner.svg)
 
 **AI-Powered Career Decision Support Tool**
 

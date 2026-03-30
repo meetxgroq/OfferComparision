@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import axios from 'axios'
 import {
@@ -47,6 +47,8 @@ export default function OfferComparePage() {
   const [showOfferModal, setShowOfferModal] = useState(false)
   const [editingOffer, setEditingOffer] = useState<Offer | undefined>(undefined)
   const [modalVersion, setModalVersion] = useState(0)
+  const [comparisonCurrency, setComparisonCurrency] = useState<string>('USD')
+  const [currentCountry, setCurrentCountry] = useState<string>('')
 
   // Load data from localStorage on component mount
   useEffect(() => {
@@ -114,6 +116,15 @@ export default function OfferComparePage() {
     }
   }, [selectedOffers])
 
+  // Re-run analysis when comparison currency changes (if results already exist)
+  const runAnalysisRef = useRef<(() => void) | null>(null)
+  useEffect(() => {
+    if (analysisResults && selectedOffers.length >= 2 && !isAnalyzing && runAnalysisRef.current) {
+      runAnalysisRef.current()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comparisonCurrency])
+
   const handleAddOffer = useCallback((newOffer: Offer) => {
     if (editingOffer) {
       setOffers(prev => prev.map(o => o.id === newOffer.id ? newOffer : o))
@@ -175,22 +186,33 @@ export default function OfferComparePage() {
       const endpoint = useDeepAnalysis ? '/api/analyze' : '/api/analyze/quick'
       const response = await axios.post(`${base}${endpoint}`, {
         offers: selectedOfferData,
-        user_preferences: preferences
+        user_preferences: { ...preferences, current_country: currentCountry || undefined },
+        comparison_currency: comparisonCurrency,
       }, { headers: authHeaders(token) })
       setAnalysisResults(response.data)
 
       // Synchronize global offers state with AI-enriched data to ensure Job Cards match Snapshot
       if (response.data.offers && response.data.offers.length > 0) {
+        const STALE_CURRENCY_KEYS = [
+          'local_currency', 'local_total_compensation', 'local_base_salary',
+          'local_equity', 'local_bonus', 'fx_rate_used',
+          'normalized_base_salary', 'normalized_equity', 'normalized_bonus',
+          'normalized_total_compensation', 'comparison_currency', 'net_savings',
+        ]
         setOffers(prevOffers => {
           const updatedOffers = [...prevOffers];
           response.data.offers.forEach((enrichedOffer: any) => {
             const index = updatedOffers.findIndex(o => o.id === enrichedOffer.id);
             if (index !== -1) {
-              // Merge AI-calculated fields (grades, tax, etc.) into the main offer object
+              // Clear stale currency/analysis fields before merging so that
+              // absent keys (e.g. local_currency when offer matches comparison
+              // currency) don't persist from a previous analysis run.
+              const cleaned: any = { ...updatedOffers[index] };
+              for (const key of STALE_CURRENCY_KEYS) delete cleaned[key];
+
               updatedOffers[index] = {
-                ...updatedOffers[index],
+                ...cleaned,
                 ...enrichedOffer,
-                // Ensure specific grades are prioritized from AI results
                 wlb_grade: enrichedOffer.wlb_grade,
                 benefits_grade: enrichedOffer.benefits_grade,
                 growth_grade: enrichedOffer.growth_grade
@@ -245,6 +267,7 @@ export default function OfferComparePage() {
       setIsAnalyzing(false)
     }
   }
+  runAnalysisRef.current = runAnalysis
 
   const handleClearAllData = useCallback(() => {
     if (confirm('Are you sure you want to clear all saved offers and preferences? This action cannot be undone.')) {
@@ -462,6 +485,7 @@ export default function OfferComparePage() {
                 onToggleSelection={handleToggleSelection}
                 onRemoveOffer={handleRemoveOffer}
                 onEditOffer={handleEditOffer}
+                comparisonCurrency={comparisonCurrency}
               />
 
               <div className="glass-card p-4 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4 border-l-4 border-l-cyan-500">
@@ -476,6 +500,43 @@ export default function OfferComparePage() {
                 </div>
 
                 <div className="flex flex-col items-end gap-2">
+                  <div className="flex flex-wrap items-center gap-2 justify-end mb-1">
+                    <select
+                      value={comparisonCurrency}
+                      onChange={(e) => setComparisonCurrency(e.target.value)}
+                      className="text-sm border border-slate-600 rounded-lg px-3 py-2 bg-slate-800 text-slate-200 focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all hover:border-slate-500"
+                    >
+                      <option value="USD">Compare in USD ($)</option>
+                      <option value="INR">Compare in INR (₹)</option>
+                      <option value="GBP">Compare in GBP (£)</option>
+                      <option value="EUR">Compare in EUR (€)</option>
+                      <option value="AED">Compare in AED (د.إ)</option>
+                      <option value="SGD">Compare in SGD (S$)</option>
+                      <option value="CAD">Compare in CAD (C$)</option>
+                      <option value="AUD">Compare in AUD (A$)</option>
+                      <option value="JPY">Compare in JPY (¥)</option>
+                      <option value="CHF">Compare in CHF</option>
+                    </select>
+                    <select
+                      value={currentCountry}
+                      onChange={(e) => setCurrentCountry(e.target.value)}
+                      className="text-sm border border-slate-600 rounded-lg px-3 py-2 bg-slate-800 text-slate-200 focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all hover:border-slate-500"
+                    >
+                      <option value="">Current Country (optional)</option>
+                      <option value="United States">United States</option>
+                      <option value="India">India</option>
+                      <option value="UAE">UAE</option>
+                      <option value="United Kingdom">United Kingdom</option>
+                      <option value="Germany">Germany</option>
+                      <option value="Singapore">Singapore</option>
+                      <option value="Canada">Canada</option>
+                      <option value="Australia">Australia</option>
+                      <option value="Japan">Japan</option>
+                      <option value="Netherlands">Netherlands</option>
+                      <option value="Switzerland">Switzerland</option>
+                      <option value="Israel">Israel</option>
+                    </select>
+                  </div>
                   {/* Analysis Mode Toggle */}
                   <div className="flex items-center gap-3 mb-2">
                     <label className="flex items-center gap-2 text-sm text-slate-400 cursor-pointer group">
@@ -546,7 +607,11 @@ export default function OfferComparePage() {
                 <span className="w-2 h-8 bg-gradient-to-b from-purple-400 to-pink-600 rounded-full block"></span>
                 <h2 className="text-3xl font-bold text-white">AI Analysis Results</h2>
               </div>
-              <AnalysisResults results={analysisResults} isDeepAnalysis={useDeepAnalysis} />
+              <AnalysisResults
+                results={analysisResults}
+                isDeepAnalysis={useDeepAnalysis}
+                comparisonCurrency={comparisonCurrency}
+              />
             </motion.div>
           )}
         </AnimatePresence>

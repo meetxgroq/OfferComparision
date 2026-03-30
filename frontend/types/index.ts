@@ -19,6 +19,8 @@ export interface Offer {
   // role_fit removed
   job_description?: string
   relocation_support?: boolean
+  currency: string // ISO 4217, default "USD"
+  country?: string // Inferred from location
   other_perks?: string
   total_compensation?: number
 
@@ -38,6 +40,7 @@ export interface UserPreferences {
   growth_weight: number
   culture_weight: number
   benefits_weight: number
+  current_country?: string
 }
 
 export interface UserProfile {
@@ -98,6 +101,22 @@ export interface AnalysisResults {
     lifestyle_comparison?: {
       location_tradeoffs?: string
       hidden_costs?: string
+    }
+    relocation_analysis?: {
+      is_cross_country: boolean
+      transitions: Array<{
+        from_country: string
+        to_country: string
+        visa_requirements: string
+        tax_comparison: string
+        healthcare: string
+        quality_of_life: string
+        career_ecosystem: string
+        financial_considerations: string
+        pros: string[]
+        cons: string[]
+        overall_recommendation: string
+      }>
     }
   }
   comparison_results: {

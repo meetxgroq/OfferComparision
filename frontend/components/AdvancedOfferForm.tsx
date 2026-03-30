@@ -13,6 +13,7 @@ import {
 import { Offer, WORK_TYPES, EMPLOYMENT_TYPES, DOMAINS, BENEFITS_GRADES } from '@/types'
 import { POPULAR_COMPANIES } from '@/data/companies'
 import { getApiBase } from '@/lib/api'
+import { getCurrencySymbol, formatCurrency } from '@/lib/currency'
 import FileUpload from './FileUpload'
 import Slider from './Slider'
 
@@ -44,6 +45,8 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
     // role_fit removed
     job_description: editOffer?.job_description || '',
     relocation_support: editOffer?.relocation_support || false,
+    currency: editOffer?.currency || 'USD',
+    country: editOffer?.country,
     other_perks: editOffer?.other_perks || ''
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -78,6 +81,7 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
   const [locationSuggestions, setLocationSuggestions] = useState<string[]>([])
   const [filteredLocations, setFilteredLocations] = useState<string[]>([])
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false)
+  const [currencies, setCurrencies] = useState<Array<{ code: string; symbol: string; name: string }>>([])
 
   // Fetch locations on mount
   useEffect(() => {
@@ -96,6 +100,13 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
     };
     fetchLocations();
   }, []);
+
+  useEffect(() => {
+    fetch(`${getApiBase()}/api/currencies`)
+      .then(res => res.json())
+      .then(data => setCurrencies(data))
+      .catch(() => {})
+  }, [])
 
   const validateForm = useCallback(() => {
     const newErrors: Record<string, string> = {}
@@ -250,6 +261,8 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
       // role_fit removed
       job_description: formData.job_description,
       relocation_support: formData.relocation_support,
+      currency: formData.currency || 'USD',
+      country: formData.country,
       other_perks: formData.other_perks,
       total_compensation: totalCompensation
     }
@@ -263,6 +276,58 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
       setErrors(prev => ({ ...prev, [field]: '' }))
     }
   }, [errors])
+
+  const inferCurrencyFromLocation = useCallback((location: string): string | null => {
+    const loc = location.toLowerCase()
+    const LOCATION_CURRENCY_MAP: Record<string, string> = {
+      'india': 'INR',
+      'uk': 'GBP',
+      'united kingdom': 'GBP',
+      'england': 'GBP',
+      'germany': 'EUR',
+      'france': 'EUR',
+      'netherlands': 'EUR',
+      'ireland': 'EUR',
+      'spain': 'EUR',
+      'italy': 'EUR',
+      'portugal': 'EUR',
+      'austria': 'EUR',
+      'belgium': 'EUR',
+      'finland': 'EUR',
+      'uae': 'AED',
+      'dubai': 'AED',
+      'abu dhabi': 'AED',
+      'singapore': 'SGD',
+      'canada': 'CAD',
+      'australia': 'AUD',
+      'japan': 'JPY',
+      'switzerland': 'CHF',
+      'zurich': 'CHF',
+      'israel': 'ILS',
+      'tel aviv': 'ILS',
+      'china': 'CNY',
+      'beijing': 'CNY',
+      'shanghai': 'CNY',
+      'south korea': 'KRW',
+      'seoul': 'KRW',
+      'brazil': 'BRL',
+      'mexico': 'MXN',
+      'sweden': 'SEK',
+      'norway': 'NOK',
+      'denmark': 'DKK',
+      'poland': 'PLN',
+      'new zealand': 'NZD',
+    }
+    for (const [pattern, currency] of Object.entries(LOCATION_CURRENCY_MAP)) {
+      if (loc.includes(pattern)) return currency
+    }
+    if (/,\s*[a-z]{2}$/i.test(location.trim()) && !loc.includes('uk') && !loc.includes('uae')) {
+      const suffix = location.trim().slice(-2).toUpperCase()
+      const US_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC']
+      if (US_STATES.includes(suffix)) return 'USD'
+    }
+    return null
+  }, [])
 
   const handleFileUpload = useCallback(async (file: File) => {
     setIsUploading(true)
@@ -293,6 +358,7 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
   }, [])
 
   const totalCompensation = (formData.base_salary || 0) + (formData.equity || 0) + (formData.bonus || 0)
+  const symbol = getCurrencySymbol(formData.currency || 'USD')
 
   return (
     <motion.div
@@ -521,7 +587,13 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
                             setShowLocationSuggestions(true)
                           }
                         }}
-                        onBlur={() => setTimeout(() => setShowLocationSuggestions(false), 200)}
+                        onBlur={() => {
+                          setTimeout(() => setShowLocationSuggestions(false), 200)
+                          if (formData.location) {
+                            const inferred = inferCurrencyFromLocation(formData.location)
+                            if (inferred) handleInputChange('currency', inferred)
+                          }
+                        }}
                         className={`w-full px-4 py-3 bg-white/5 border rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all ${errors.location ? 'border-red-500/50 focus:ring-red-500' : 'border-white/10 hover:border-white/20'
                           }`}
                         placeholder="e.g., San Francisco, CA"
@@ -545,6 +617,8 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
                               onMouseDown={(e) => {
                                 e.preventDefault()
                                 handleInputChange('location', loc)
+                                const inferred = inferCurrencyFromLocation(loc)
+                                if (inferred) handleInputChange('currency', inferred)
                                 setShowLocationSuggestions(false)
                               }}
                             >
@@ -555,6 +629,25 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
                       )}
                     </div>
                     {errors.location && <p className="mt-1 text-sm text-red-400">{errors.location}</p>}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Currency</label>
+                    <select
+                      value={formData.currency || 'USD'}
+                      onChange={(e) => handleInputChange('currency', e.target.value)}
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent appearance-none transition-all hover:border-white/20"
+                    >
+                      {currencies.length === 0 ? (
+                        <option value="USD" className="bg-slate-800">USD</option>
+                      ) : (
+                        currencies.map((c) => (
+                          <option key={c.code} value={c.code} className="bg-slate-800">
+                            {c.symbol} {c.code} — {c.name}
+                          </option>
+                        ))
+                      )}
+                    </select>
                   </div>
 
                   <div className="relative group">
@@ -631,7 +724,7 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">Base Salary ($) *</label>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Base Salary ({symbol}) *</label>
                     <input
                       type="number"
                       value={formData.base_salary || ''}
@@ -643,7 +736,7 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">Equity/Stock ($/yr)</label>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Equity/Stock ({symbol}/yr)</label>
                     <input
                       type="number"
                       value={formData.equity || ''}
@@ -654,7 +747,7 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">Annual Bonus ($)</label>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Annual Bonus ({symbol})</label>
                     <input
                       type="number"
                       value={formData.bonus || ''}
@@ -665,7 +758,7 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">Signing Bonus ($)</label>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Signing Bonus ({symbol})</label>
                     <input
                       type="number"
                       value={formData.signing_bonus || ''}
@@ -680,7 +773,7 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
                   <div className="mt-6 p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
                     <p className="text-sm font-medium text-green-400 flex justify-between items-center">
                       <span>Total Annual Compensation</span>
-                      <span className="text-xl font-bold">${totalCompensation.toLocaleString()}</span>
+                      <span className="text-xl font-bold">{formatCurrency(totalCompensation, formData.currency || 'USD')}</span>
                     </p>
                   </div>
                 )}

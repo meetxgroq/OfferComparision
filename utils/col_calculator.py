@@ -71,7 +71,7 @@ COST_OF_LIVING_DATA = {
     "Toronto, Canada": 65.0,
     "Vancouver, Canada": 70.0,
     "Montreal, Canada": 55.0,
-    "Tel Aviv, Israel": 75.0,
+    "Tel Aviv, Israel": 72.0,
     "Seoul, South Korea": 70.0,
     "Taipei, Taiwan": 50.0,
     "Shanghai, China": 55.0,
@@ -90,7 +90,14 @@ COST_OF_LIVING_DATA = {
     "Lisbon, Portugal": 50.0,
     "Cape Town, South Africa": 28.0,
     "Dubai, UAE": 65.0,
-    "Riyadh, Saudi Arabia": 50.0,
+    "Abu Dhabi, UAE": 62.0,
+    "Doha, Qatar": 58.0,
+    "Riyadh, Saudi Arabia": 40.0,
+    "Jakarta, Indonesia": 32.0,
+    "Bangkok, Thailand": 35.0,
+    "Ho Chi Minh City, Vietnam": 28.0,
+    "Kuala Lumpur, Malaysia": 30.0,
+    "Manila, Philippines": 25.0,
     "Cairo, Egypt": 18.0,
 }
 
@@ -158,6 +165,25 @@ def get_cost_index(location):
     return COST_OF_LIVING_DATA.get(normalized_location, 75.0)  # Default for unknown locations (per tests)
 
 BASELINE_ANNUAL_EXPENSES = 60000.0  # Baseline annual living expenses for a single person in SF
+
+BASELINE_EXPENSES_BY_COUNTRY = {
+    "United States": 60000,
+    "India": 6000,
+    "UAE": 30000,
+    "United Kingdom": 42000,
+    "Germany": 30000,
+    "Singapore": 36000,
+    "Canada": 36000,
+    "Australia": 40000,
+    "Japan": 36000,
+    "Netherlands": 33000,
+    "Switzerland": 55000,
+    "Ireland": 36000,
+    "South Korea": 24000,
+    "Saudi Arabia": 24000,
+    "Qatar": 28000,
+    "Israel": 36000,
+}
 
 def estimate_annual_expenses(location):
     """

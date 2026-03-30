@@ -8,6 +8,8 @@ from utils.call_llm import call_llm, call_llm_structured, call_llm_async, call_l
 from utils.web_research import research_company, get_market_sentiment, research_company_async, get_market_sentiment_async
 from utils.col_calculator import estimate_annual_expenses, get_location_insights
 from utils.tax_calculator import calculate_net_pay
+from utils.currency import convert_to_usd, convert_from_usd, get_fx_rate, infer_currency
+from utils.country_data import infer_country
 from utils.market_data import (get_compensation_insights, calculate_market_percentile, ai_market_analysis,
                               get_compensation_insights_async, calculate_market_percentile_async, ai_market_analysis_async)
 from utils.levels import get_universal_level_async, get_level_description
@@ -1351,53 +1353,98 @@ class QuickFinancialAnalysisNode(BatchNode):
     """
     
     def prep(self, shared):
-        """Extract offers and user base location."""
+        """Extract offers, user base location, and comparison currency."""
         offers = shared.get("offers", [])
         user_base_location = shared.get("user_preferences", {}).get("base_location", "San Francisco, CA")
-        
+        comparison_currency = shared.get("comparison_currency", "USD")
+
         items = []
         for offer in offers:
             items.append({
                 "offer": offer,
-                "base_location": user_base_location
+                "base_location": user_base_location,
+                "comparison_currency": comparison_currency,
             })
         return items
-    
+
     def exec(self, item):
         """Calculate tax, net pay, COL, and net savings for a single offer."""
         offer = item["offer"]
         base_location = item["base_location"]
-        
-        # Determine tax location (handle Remote)
+        comparison_currency = item["comparison_currency"]
+        offer_currency = offer.get("currency", "USD")
+
         tax_location = offer["location"]
         if "remote" in tax_location.lower():
             tax_location = base_location
-        
-        # Calculate net pay (tax calculation)
-        net_pay_analysis = calculate_net_pay(
-            offer["total_compensation"],
-            tax_location
-        )
-        
-        # Calculate COL and expenses
+
+        # Normalize all comp fields to USD first (universal pivot)
+        total_comp = offer["total_compensation"]
+        base_salary = offer.get("base_salary", 0)
+        equity = offer.get("equity", 0)
+        bonus = offer.get("bonus", 0)
+
+        if offer_currency != "USD":
+            total_comp_usd = convert_to_usd(total_comp, offer_currency)
+            base_salary_usd = convert_to_usd(base_salary, offer_currency)
+            equity_usd = convert_to_usd(equity, offer_currency)
+            bonus_usd = convert_to_usd(bonus, offer_currency)
+        else:
+            total_comp_usd = total_comp
+            base_salary_usd = base_salary
+            equity_usd = equity
+            bonus_usd = bonus
+
+        # Tax and COL use USD
+        net_pay_analysis = calculate_net_pay(total_comp_usd, tax_location)
         expense_analysis = estimate_annual_expenses(offer["location"])
         annual_expenses = expense_analysis["estimated_annual_expenses"]
-        
-        # Calculate net savings
-        net_pay = net_pay_analysis["estimated_net_pay"]
-        net_savings = net_pay - annual_expenses
-        
-        return {
+
+        net_pay_usd = net_pay_analysis["estimated_net_pay"]
+        net_savings_usd = net_pay_usd - annual_expenses
+
+        # Convert to comparison currency if needed
+        if comparison_currency != "USD":
+            net_savings_comp = convert_from_usd(net_savings_usd, comparison_currency)
+            total_comp_comp = convert_from_usd(total_comp_usd, comparison_currency)
+            base_salary_comp = convert_from_usd(base_salary_usd, comparison_currency)
+            equity_comp = convert_from_usd(equity_usd, comparison_currency)
+            bonus_comp = convert_from_usd(bonus_usd, comparison_currency)
+        else:
+            net_savings_comp = net_savings_usd
+            total_comp_comp = total_comp_usd
+            base_salary_comp = base_salary_usd
+            equity_comp = equity_usd
+            bonus_comp = bonus_usd
+
+        result = {
             "offer_id": offer["id"],
             "net_pay_analysis": net_pay_analysis,
             "expense_analysis": expense_analysis,
-            "net_savings": net_savings
+            "net_savings": net_savings_comp,
+            "comparison_currency": comparison_currency,
+            "normalized_base_salary": base_salary_comp,
+            "normalized_equity": equity_comp,
+            "normalized_bonus": bonus_comp,
+            "normalized_total_compensation": total_comp_comp,
         }
-    
+
+        # Preserve local currency fields for dual display
+        if offer_currency != comparison_currency:
+            fx_rate = get_fx_rate(offer_currency, comparison_currency)
+            result["local_currency"] = offer_currency
+            result["local_total_compensation"] = offer["total_compensation"]
+            result["local_base_salary"] = base_salary
+            result["local_equity"] = equity
+            result["local_bonus"] = bonus
+            result["fx_rate_used"] = fx_rate
+
+        return result
+
     def post(self, shared, prep_res, exec_res_list):
         """Update offers with financial analysis."""
         results_lookup = {r["offer_id"]: r for r in exec_res_list}
-        
+
         for offer in shared["offers"]:
             if offer["id"] in results_lookup:
                 res = results_lookup[offer["id"]]
@@ -1407,7 +1454,25 @@ class QuickFinancialAnalysisNode(BatchNode):
                 offer["estimated_annual_expenses"] = res["expense_analysis"]["estimated_annual_expenses"]
                 offer["net_savings"] = res["net_savings"]
                 offer["estimated_tax"] = res["net_pay_analysis"]["estimated_tax_amount"]
-        
+                offer["comparison_currency"] = res["comparison_currency"]
+                offer["normalized_base_salary"] = res["normalized_base_salary"]
+                offer["normalized_equity"] = res["normalized_equity"]
+                offer["normalized_bonus"] = res["normalized_bonus"]
+                offer["normalized_total_compensation"] = res["normalized_total_compensation"]
+
+                if "local_currency" in res:
+                    offer["local_currency"] = res["local_currency"]
+                    offer["local_total_compensation"] = res["local_total_compensation"]
+                    offer["local_base_salary"] = res["local_base_salary"]
+                    offer["local_equity"] = res["local_equity"]
+                    offer["local_bonus"] = res["local_bonus"]
+                    offer["fx_rate_used"] = res["fx_rate_used"]
+                else:
+                    for stale_key in ("local_currency", "local_total_compensation",
+                                      "local_base_salary", "local_equity",
+                                      "local_bonus", "fx_rate_used"):
+                        offer.pop(stale_key, None)
+
         print(f"Quick financial analysis completed for {len(exec_res_list)} offers")
         return "default"
 
@@ -1594,11 +1659,24 @@ class QuickAIAnalysisNode(AsyncNode):
         
         # Calculate weights for scoring
         weights = customize_weights(user_preferences)
-        
+
+        # Detect cross-country comparison
+        countries = set()
+        for offer in offers:
+            country = offer.get("country") or infer_country(offer.get("location", ""))
+            if country:
+                countries.add(country)
+
+        is_cross_country = len(countries) > 1
+        current_country = user_preferences.get("current_country")
+
         return {
             "offers": offers,
             "user_preferences": user_preferences,
-            "scoring_weights": weights
+            "scoring_weights": weights,
+            "is_cross_country": is_cross_country,
+            "countries_involved": list(countries),
+            "current_country": current_country,
         }
     
     async def exec_async(self, prep_data):
@@ -1627,7 +1705,14 @@ class QuickAIAnalysisNode(AsyncNode):
         winner_company = top_offer.get("company", "Top choice")
         
         # Build comprehensive prompt with all offer data
-        prompt = self._build_quick_analysis_prompt(offers, user_preferences, weights)
+        prompt = self._build_quick_analysis_prompt(
+            offers,
+            user_preferences,
+            weights,
+            is_cross_country=prep_data.get("is_cross_country", False),
+            countries_involved=prep_data.get("countries_involved"),
+            current_country=prep_data.get("current_country"),
+        )
         
         analysis_data = None
         try:
@@ -1792,6 +1877,10 @@ class QuickAIAnalysisNode(AsyncNode):
         end_time = time.time()
         print(f"[DEBUG] QuickAIAnalysis completed in {end_time - start_time:.2f}s")
         
+        relocation_analysis = (
+            analysis_data.get("relocation_analysis") if analysis_data else None
+        )
+
         return {
             "net_value_analysis": net_value_analysis,
             "lifestyle_comparison": lifestyle_comparison,
@@ -1802,7 +1891,8 @@ class QuickAIAnalysisNode(AsyncNode):
             "reality_checks": reality_checks,
             "comparison_summary": comparison_summary,
             "offer_recommendations": offer_recommendations,
-            "comparison_results": comparison_results
+            "comparison_results": comparison_results,
+            "relocation_analysis": relocation_analysis,
         }
     
     async def post_async(self, shared, prep_res, exec_res):
@@ -1853,11 +1943,25 @@ class QuickAIAnalysisNode(AsyncNode):
         shared["comparison_summary"] = exec_res.get("comparison_summary", comparison_results.get("comparison_summary", ""))
         shared["comparison_results"] = comparison_results
         shared["scoring_weights"] = prep_res["scoring_weights"]
-        
+
+        relocation = exec_res.get("relocation_analysis")
+        if relocation:
+            shared["relocation_analysis"] = relocation
+            if "final_report" in shared:
+                shared["final_report"]["relocation_analysis"] = relocation
+
         print("Quick AI analysis completed")
         return "default"
     
-    def _build_quick_analysis_prompt(self, offers, user_preferences, weights):
+    def _build_quick_analysis_prompt(
+        self,
+        offers,
+        user_preferences,
+        weights,
+        is_cross_country=False,
+        countries_involved=None,
+        current_country=None,
+    ):
         """Build Net Value Analysis prompt for quick analysis."""
         prompt = f"""
 Act as a senior financial advisor and career coach. Conduct a "Net Value Analysis" comparing {len(offers)} job offers to determine which provides better quality of life and financial outlook.
@@ -1872,8 +1976,34 @@ OFFERS DATA:
             net_savings = offer.get('net_savings', 0)
             tax_rate = offer.get('net_pay_analysis', {}).get('effective_tax_rate', 0)
             tax_rate_pct = f"{tax_rate * 100:.1f}%" if tax_rate > 0 else "N/A"
-            
-            prompt += f"""
+
+            local_cur = offer.get("local_currency")
+            if local_cur:
+                local_total = offer.get("local_total_compensation", 0)
+                local_base = offer.get("local_base_salary", 0)
+                fx_rate = float(offer.get("fx_rate_used") or 0)
+                norm_base = offer.get(
+                    "normalized_base_salary", offer.get("base_salary", 0)
+                )
+                norm_total = offer.get(
+                    "normalized_total_compensation",
+                    offer.get("total_compensation", 0),
+                )
+                prompt += f"""
+Offer {i}:
+- Company: {offer.get('company', 'Unknown')}
+- Position: {offer.get('position', 'Unknown')}
+- Location: {offer.get('location', 'Unknown')}
+- Currency: {local_cur} (FX: 1 {local_cur} = {fx_rate:.4f} USD)
+- Base Salary: {local_base:,.0f} {local_cur} (≈ ${norm_base:,.0f} USD)
+- Total Compensation: {local_total:,.0f} {local_cur} (≈ ${norm_total:,.0f} USD)
+- Estimated Tax Rate: {tax_rate_pct}
+- Net Pay (USD equivalent): ${net_pay:,}
+- Cost of Living: ${annual_expenses:,}/year
+- Net Savings: ${net_savings:,}
+"""
+            else:
+                prompt += f"""
 Offer {i}:
 - Company: {offer.get('company', 'Unknown')}
 - Position: {offer.get('position', 'Unknown')}
@@ -2022,6 +2152,46 @@ IMPORTANT: For each offer in ranked_offers, generate personalized growth content
 - growth_score >= 8.0: "Strong long-term potential" + bullets like "Technical leadership opportunities", "Continuous learning culture"
 - growth_score >= 7.0: "Solid growth opportunities" + bullets like "Defined career ladder", "Mentorship available"
 - growth_score < 7.0: Adjust language to reflect moderate or limited growth potential
+"""
+        if is_cross_country:
+            countries_str = ", ".join(countries_involved or [])
+            prompt += f"""
+
+7. Relocation Analysis: The user is comparing offers across different countries.
+   Current country: {current_country or 'Not specified'}
+   Offer countries: {countries_str}
+
+   For EACH country transition, analyze:
+   - Visa/work permit requirements and timeline
+   - Tax regime comparison
+   - Healthcare system comparison
+   - Quality of life factors
+   - Career ecosystem comparison
+   - Financial considerations (retirement, currency stability)
+   - Pros (top 3-5 reasons to move)
+   - Cons (top 3-5 reasons to stay)
+
+Add to your JSON response:
+"relocation_analysis": {{
+    "is_cross_country": true,
+    "transitions": [
+        {{
+            "from_country": "Country A",
+            "to_country": "Country B",
+            "visa_requirements": "summary",
+            "tax_comparison": "summary",
+            "healthcare": "summary",
+            "quality_of_life": "summary",
+            "career_ecosystem": "summary",
+            "financial_considerations": "summary",
+            "pros": ["pro1", "pro2", "pro3"],
+            "cons": ["con1", "con2", "con3"],
+            "overall_recommendation": "summary"
+        }}
+    ]
+}}
+"""
+        prompt += """
 
 Be objective, highlight hidden costs, and provide actionable insights. Focus on real financial impact and quality of life.
 """
