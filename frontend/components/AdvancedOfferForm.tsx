@@ -277,56 +277,18 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
     }
   }, [errors])
 
-  const inferCurrencyFromLocation = useCallback((location: string): string | null => {
-    const loc = location.toLowerCase()
-    const LOCATION_CURRENCY_MAP: Record<string, string> = {
-      'india': 'INR',
-      'uk': 'GBP',
-      'united kingdom': 'GBP',
-      'england': 'GBP',
-      'germany': 'EUR',
-      'france': 'EUR',
-      'netherlands': 'EUR',
-      'ireland': 'EUR',
-      'spain': 'EUR',
-      'italy': 'EUR',
-      'portugal': 'EUR',
-      'austria': 'EUR',
-      'belgium': 'EUR',
-      'finland': 'EUR',
-      'uae': 'AED',
-      'dubai': 'AED',
-      'abu dhabi': 'AED',
-      'singapore': 'SGD',
-      'canada': 'CAD',
-      'australia': 'AUD',
-      'japan': 'JPY',
-      'switzerland': 'CHF',
-      'zurich': 'CHF',
-      'israel': 'ILS',
-      'tel aviv': 'ILS',
-      'china': 'CNY',
-      'beijing': 'CNY',
-      'shanghai': 'CNY',
-      'south korea': 'KRW',
-      'seoul': 'KRW',
-      'brazil': 'BRL',
-      'mexico': 'MXN',
-      'sweden': 'SEK',
-      'norway': 'NOK',
-      'denmark': 'DKK',
-      'poland': 'PLN',
-      'new zealand': 'NZD',
+  const inferCurrencyFromLocation = useCallback(async (location: string): Promise<string | null> => {
+    if (!location || location.trim().length < 2) return null
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/infer-location?location=${encodeURIComponent(location)}`
+      )
+      if (!res.ok) return null
+      const data = await res.json()
+      return data.currency || null
+    } catch {
+      return null
     }
-    for (const [pattern, currency] of Object.entries(LOCATION_CURRENCY_MAP)) {
-      if (loc.includes(pattern)) return currency
-    }
-    if (/,\s*[a-z]{2}$/i.test(location.trim()) && !loc.includes('uk') && !loc.includes('uae')) {
-      const suffix = location.trim().slice(-2).toUpperCase()
-      const US_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC']
-      if (US_STATES.includes(suffix)) return 'USD'
-    }
-    return null
   }, [])
 
   const handleFileUpload = useCallback(async (file: File) => {
@@ -590,8 +552,9 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
                         onBlur={() => {
                           setTimeout(() => setShowLocationSuggestions(false), 200)
                           if (formData.location) {
-                            const inferred = inferCurrencyFromLocation(formData.location)
-                            if (inferred) handleInputChange('currency', inferred)
+                            inferCurrencyFromLocation(formData.location).then((inferred) => {
+                              if (inferred) handleInputChange('currency', inferred)
+                            })
                           }
                         }}
                         className={`w-full px-4 py-3 bg-white/5 border rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all ${errors.location ? 'border-red-500/50 focus:ring-red-500' : 'border-white/10 hover:border-white/20'
@@ -617,8 +580,9 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
                               onMouseDown={(e) => {
                                 e.preventDefault()
                                 handleInputChange('location', loc)
-                                const inferred = inferCurrencyFromLocation(loc)
-                                if (inferred) handleInputChange('currency', inferred)
+                                inferCurrencyFromLocation(loc).then((inferred) => {
+                                  if (inferred) handleInputChange('currency', inferred)
+                                })
                                 setShowLocationSuggestions(false)
                               }}
                             >
