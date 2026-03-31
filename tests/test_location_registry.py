@@ -119,6 +119,20 @@ class TestInferCurrency:
         assert infer_currency("Remote") == "USD"
 
 
+class TestCurrencySuffixAmbiguity:
+    def test_gary_indiana_gets_usd(self):
+        assert infer_currency("Gary, IN") == "USD"
+
+    def test_fake_city_california_gets_usd(self):
+        assert infer_currency("Random City, CA") == "USD"
+
+    def test_explicit_india_still_inr(self):
+        assert infer_currency("Mysore, India") == "INR"
+
+    def test_toronto_on_gets_cad(self):
+        assert infer_currency("Brampton, ON") == "CAD"
+
+
 class TestInferCountry:
     def test_sf(self):
         assert infer_country("San Francisco, CA") == "United States"

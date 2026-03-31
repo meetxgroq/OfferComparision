@@ -283,8 +283,6 @@ _COUNTRY_SUFFIX_TO_CURRENCY: Dict[str, str] = {
     "thailand": "THB", "vietnam": "VND",
     "indonesia": "IDR", "malaysia": "MYR", "philippines": "PHP",
     "singapore": "SGD", "hong kong": "HKD",
-    # US state codes that might appear as suffixes
-    "mi": "USD", "tn": "USD", "ut": "USD", "oh": "USD", "mo": "USD", "nv": "USD",
 }
 
 _US_STATE_CODES = [
@@ -294,6 +292,11 @@ _US_STATE_CODES = [
     "va", "wa", "wv", "wi", "wy", "dc",
 ]
 _CA_PROVINCE_CODES = ["ab", "bc", "mb", "nb", "nl", "ns", "nt", "nu", "on", "pe", "qc", "sk", "yt"]
+
+for _code in _US_STATE_CODES:
+    _COUNTRY_SUFFIX_TO_CURRENCY[_code] = "USD"
+for _code in _CA_PROVINCE_CODES:
+    _COUNTRY_SUFFIX_TO_CURRENCY[_code] = "CAD"
 
 _COUNTRY_SUFFIX_TO_COUNTRY: Dict[str, str] = {
     "india": "India", "uae": "UAE", "united arab emirates": "UAE",
