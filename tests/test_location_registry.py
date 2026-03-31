@@ -1,7 +1,9 @@
 """Tests for utils.location_registry — canonical location data and helpers."""
 
 import pytest
+from fastapi.testclient import TestClient
 
+from api_server import app
 from utils.location_registry import (
     LOCATION_REGISTRY,
     normalize_location,
@@ -12,6 +14,35 @@ from utils.location_registry import (
     infer_country,
     get_all_locations,
 )
+
+client = TestClient(app)
+
+
+class TestInferLocationEndpoint:
+    def test_bangalore_india(self):
+        resp = client.get("/api/infer-location", params={"location": "Bangalore, India"})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["currency"] == "INR"
+        assert data["country"] == "India"
+        assert data["col_index"] == 25.0
+
+    def test_bare_sf(self):
+        resp = client.get("/api/infer-location", params={"location": "sf"})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["currency"] == "USD"
+        assert data["country"] == "United States"
+
+    def test_unknown_location(self):
+        resp = client.get("/api/infer-location", params={"location": "Atlantis"})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["currency"] == "USD"
+
+    def test_missing_param(self):
+        resp = client.get("/api/infer-location")
+        assert resp.status_code == 422
 
 
 class TestNormalizeLocation:

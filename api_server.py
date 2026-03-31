@@ -173,11 +173,33 @@ def get_positions() -> Dict[str, List[str]]:
     return {"positions": get_all_positions()}
 
 from utils.locations import get_all_locations
+from utils.location_registry import (
+    normalize_location as registry_normalize,
+    get_col_index as registry_col,
+    infer_currency as registry_infer_currency,
+    infer_country as registry_infer_country,
+    get_tax_rate as registry_tax,
+    get_salary_multiplier as registry_multiplier,
+)
 
 @app.get("/api/locations", response_model=Dict[str, List[str]])
 def get_locations() -> Dict[str, List[str]]:
     """Get all supported location suggestions."""
     return {"locations": get_all_locations()}
+
+
+@app.get("/api/infer-location")
+def infer_location(location: str):
+    """Infer currency, country, COL index, tax rate, and salary multiplier for a location."""
+    canonical = registry_normalize(location)
+    return {
+        "canonical": canonical,
+        "currency": registry_infer_currency(location),
+        "country": registry_infer_country(location),
+        "col_index": registry_col(location),
+        "tax_rate": registry_tax(location),
+        "salary_multiplier": registry_multiplier(location),
+    }
 
 
 @app.get("/api/usage")
