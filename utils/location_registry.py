@@ -293,7 +293,10 @@ _US_STATE_CODES = [
 ]
 _CA_PROVINCE_CODES = ["ab", "bc", "mb", "nb", "nl", "ns", "nt", "nu", "on", "pe", "qc", "sk", "yt"]
 
+# Skip "in" (India ISO) and "ca" (Canada ISO); US/CA cities use full registry keys.
 for _code in _US_STATE_CODES:
+    if _code in ("in", "ca"):
+        continue
     _COUNTRY_SUFFIX_TO_CURRENCY[_code] = "USD"
 for _code in _CA_PROVINCE_CODES:
     _COUNTRY_SUFFIX_TO_CURRENCY[_code] = "CAD"
