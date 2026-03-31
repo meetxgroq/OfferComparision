@@ -1619,10 +1619,11 @@ class QuickMarketAnalysisNode(AsyncParallelBatchNode):
                     # Extract metrics for compatibility
                     culture_metrics = market_data["company_db_data"].get("culture_metrics", {})
                     if culture_metrics:
-                        # Priority: User Input > Database > Default
-                        if not offer.get("wlb_score"):
+                        wlb_score = culture_metrics.get("work_life_balance")
+                        growth_score = culture_metrics.get("career_growth")
+                        if not offer.get("wlb_score") and wlb_score is not None:
                             offer["wlb_score"] = wlb_score
-                        if not offer.get("growth_score"):
+                        if not offer.get("growth_score") and growth_score is not None:
                             offer["growth_score"] = growth_score
                         
                         # Only re-calculate grades if they are missing
