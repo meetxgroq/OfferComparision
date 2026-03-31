@@ -13,6 +13,7 @@ import {
 import { Offer, WORK_TYPES, EMPLOYMENT_TYPES, DOMAINS, BENEFITS_GRADES } from '@/types'
 import { POPULAR_COMPANIES } from '@/data/companies'
 import { getApiBase } from '@/lib/api'
+import { FALLBACK_CURRENCIES, mergeCurrencies } from '@/lib/currencies'
 import { getCurrencySymbol, formatCurrency } from '@/lib/currency'
 import FileUpload from './FileUpload'
 import Slider from './Slider'
@@ -81,7 +82,7 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
   const [locationSuggestions, setLocationSuggestions] = useState<string[]>([])
   const [filteredLocations, setFilteredLocations] = useState<string[]>([])
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false)
-  const [currencies, setCurrencies] = useState<Array<{ code: string; symbol: string; name: string }>>([])
+  const [currencies, setCurrencies] = useState(FALLBACK_CURRENCIES)
 
   // Fetch locations on mount
   useEffect(() => {
@@ -104,7 +105,7 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
   useEffect(() => {
     fetch(`${getApiBase()}/api/currencies`)
       .then(res => res.json())
-      .then(data => setCurrencies(data))
+      .then(data => setCurrencies(mergeCurrencies(data)))
       .catch(() => {})
   }, [])
 
@@ -281,7 +282,7 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
     if (!location || location.trim().length < 2) return null
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/infer-location?location=${encodeURIComponent(location)}`
+        `${process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000'}/api/infer-location?location=${encodeURIComponent(location)}`
       )
       if (!res.ok) return null
       const data = await res.json()
@@ -602,15 +603,11 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
                       onChange={(e) => handleInputChange('currency', e.target.value)}
                       className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent appearance-none transition-all hover:border-white/20"
                     >
-                      {currencies.length === 0 ? (
-                        <option value="USD" className="bg-slate-800">USD</option>
-                      ) : (
-                        currencies.map((c) => (
-                          <option key={c.code} value={c.code} className="bg-slate-800">
-                            {c.symbol} {c.code} — {c.name}
-                          </option>
-                        ))
-                      )}
+                      {currencies.map((c) => (
+                        <option key={c.code} value={c.code} className="bg-slate-800">
+                          {c.symbol} {c.code} — {c.name}
+                        </option>
+                      ))}
                     </select>
                   </div>
 

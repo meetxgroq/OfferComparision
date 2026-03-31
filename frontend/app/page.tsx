@@ -18,6 +18,7 @@ import {
 
 import { useAuth } from '@/contexts/AuthContext'
 import { getApiBase, authHeaders } from '@/lib/api'
+import { FALLBACK_CURRENCIES, mergeCurrencies } from '@/lib/currencies'
 import { fetchSavedOffers, saveOffersToCloud, deleteOfferFromCloud } from '@/lib/offers-api'
 import LoginButton from '@/components/LoginButton'
 import ProfileManager from '@/components/ProfileManager'
@@ -52,7 +53,15 @@ export default function OfferComparePage() {
   const [comparisonCurrency, setComparisonCurrency] = useState<string>('USD')
   const [currentCountry, setCurrentCountry] = useState<string>('')
   const [cloudSyncStatus, setCloudSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle')
+  const [availableCurrencies, setAvailableCurrencies] = useState(FALLBACK_CURRENCIES)
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    fetch(`${getApiBase()}/api/currencies`)
+      .then(res => res.json())
+      .then(data => setAvailableCurrencies(mergeCurrencies(data)))
+      .catch(() => {})
+  }, [])
 
   // Load data from localStorage on component mount
   useEffect(() => {
@@ -298,7 +307,7 @@ export default function OfferComparePage() {
         (error.request && !error.response)
       if (isNetworkError) {
         const base = getApiBase()
-        errorMessage = `Cannot reach the API at ${base}. Make sure the backend is running (e.g. on port 8001) and CORS allows this origin.`
+        errorMessage = `Cannot reach the API at ${base}. Make sure the backend is running (e.g. on port 8000) and CORS allows this origin.`
         setError(errorMessage)
         return
       }
@@ -577,16 +586,11 @@ export default function OfferComparePage() {
                       onChange={(e) => setComparisonCurrency(e.target.value)}
                       className="text-sm border border-slate-600 rounded-lg px-3 py-2 bg-slate-800 text-slate-200 focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all hover:border-slate-500"
                     >
-                      <option value="USD">Compare in USD ($)</option>
-                      <option value="INR">Compare in INR (₹)</option>
-                      <option value="GBP">Compare in GBP (£)</option>
-                      <option value="EUR">Compare in EUR (€)</option>
-                      <option value="AED">Compare in AED (د.إ)</option>
-                      <option value="SGD">Compare in SGD (S$)</option>
-                      <option value="CAD">Compare in CAD (C$)</option>
-                      <option value="AUD">Compare in AUD (A$)</option>
-                      <option value="JPY">Compare in JPY (¥)</option>
-                      <option value="CHF">Compare in CHF</option>
+                      {availableCurrencies.map((c) => (
+                        <option key={c.code} value={c.code}>
+                          Compare in {c.code} ({c.symbol})
+                        </option>
+                      ))}
                     </select>
                     <select
                       value={currentCountry}
@@ -610,17 +614,18 @@ export default function OfferComparePage() {
                   </div>
                   {/* Analysis Mode Toggle */}
                   <div className="flex items-center gap-3 mb-2">
-                    <label className="flex items-center gap-2 text-sm text-slate-400 cursor-pointer group">
+                    <label className={`flex items-center gap-2 text-sm text-slate-400 group ${isAnalyzing ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
                       <input
                         type="checkbox"
                         checked={useDeepAnalysis}
+                        disabled={isAnalyzing}
                         onChange={(e) => setUseDeepAnalysis(e.target.checked)}
-                        className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-cyan-600 focus:ring-cyan-500 focus:ring-offset-slate-900 transition-all"
+                        className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-cyan-600 focus:ring-cyan-500 focus:ring-offset-slate-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                       />
-                      <span className="flex items-center gap-1 group-hover:text-slate-300 transition-colors">
+                      <span className={`flex items-center gap-1 transition-colors ${isAnalyzing ? '' : 'group-hover:text-slate-300'}`}>
                         <SparklesIcon className="h-4 w-4" />
                         Enable Deep Analysis
-                        <span className="text-xs text-slate-500 group-hover:text-slate-400">(Includes Web Research)</span>
+                        <span className={`text-xs transition-colors ${isAnalyzing ? 'text-slate-500' : 'text-slate-500 group-hover:text-slate-400'}`}>(Includes Web Research)</span>
                       </span>
                     </label>
                   </div>

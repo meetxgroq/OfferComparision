@@ -3,9 +3,9 @@
  */
 export function getApiBase(): string {
   if (typeof window !== 'undefined') {
-    return (process.env.NEXT_PUBLIC_API_BASE || '').replace(/\/$/, '') || 'http://localhost:8001'
+    return (process.env.NEXT_PUBLIC_API_BASE || '').replace(/\/$/, '') || 'http://localhost:8000'
   }
-  return process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8001'
+  return process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000'
 }
 
 /**
