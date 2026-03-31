@@ -172,7 +172,7 @@ LOCATION_REGISTRY: Dict[str, LocationEntry] = {
     "Christchurch, New Zealand": LocationEntry("New Zealand", "NZD", 0.33, 45.0, 0.45),
 
     # ── Canada ──────────────────────────────────────────────────────────
-    "Toronto, Canada": LocationEntry("Canada", "CAD", 0.35, 65.0, 0.65, ["toronto, on"]),
+    "Toronto, Canada": LocationEntry("Canada", "CAD", 0.35, 65.0, 0.65, ["toronto, on", "toronto, ca"]),
     "Vancouver, Canada": LocationEntry("Canada", "CAD", 0.35, 70.0, 0.68, ["vancouver, bc"]),
     "Montreal, Canada": LocationEntry("Canada", "CAD", 0.33, 55.0, 0.65, ["montreal, qc"]),
     "Calgary, Canada": LocationEntry("Canada", "CAD", 0.33, 55.0, 0.60, ["calgary, ab"]),
@@ -185,7 +185,7 @@ LOCATION_REGISTRY: Dict[str, LocationEntry] = {
 
     # ── India ───────────────────────────────────────────────────────────
     "Bangalore, India": LocationEntry(
-        "India", "INR", 0.312, 25.0, 0.25, ["bengaluru", "blr", "bengaluru, india"]
+        "India", "INR", 0.312, 25.0, 0.25, ["bengaluru", "blr", "bengaluru, india", "bangalore, in"]
     ),
     "Mumbai, India": LocationEntry("India", "INR", 0.312, 35.0, 0.30),
     "Hyderabad, India": LocationEntry("India", "INR", 0.312, 22.0, 0.28, ["hyd"]),
@@ -295,8 +295,6 @@ _CA_PROVINCE_CODES = ["ab", "bc", "mb", "nb", "nl", "ns", "nt", "nu", "on", "pe"
 
 # Skip "in" (India ISO) and "ca" (Canada ISO); US/CA cities use full registry keys.
 for _code in _US_STATE_CODES:
-    if _code in ("in", "ca"):
-        continue
     _COUNTRY_SUFFIX_TO_CURRENCY[_code] = "USD"
 for _code in _CA_PROVINCE_CODES:
     _COUNTRY_SUFFIX_TO_CURRENCY[_code] = "CAD"
