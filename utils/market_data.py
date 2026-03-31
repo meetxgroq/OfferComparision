@@ -4,6 +4,7 @@ Provides comprehensive compensation data and market insights
 """
 
 from .call_llm import call_llm, call_llm_structured
+from utils.location_registry import LOCATION_REGISTRY
 import json
 
 # Comprehensive salary data by position and location
@@ -101,93 +102,17 @@ MARKET_SALARY_DATA = {
     }
 }
 
-# Location multipliers (relative to San Francisco baseline)
-LOCATION_SALARY_MULTIPLIERS = {
-    "San Francisco, CA": 1.0,
-    "San Jose, CA": 0.98,
-    "Palo Alto, CA": 1.02,
-    "New York, NY": 0.95,
-    "Seattle, WA": 0.90,
-    "Los Angeles, CA": 0.85,
-    "Boston, MA": 0.88,
-    "Chicago, IL": 0.75,
-    "Austin, TX": 0.80,
-    "Denver, CO": 0.78,
-    "Atlanta, GA": 0.70,
-    "Dallas, TX": 0.72,
-    "Phoenix, AZ": 0.68,
-    "Miami, FL": 0.70,
-    "Portland, OR": 0.82,
-    "San Diego, CA": 0.83,
-    "Washington, DC": 0.85,
-    "Philadelphia, PA": 0.78,
-    "Minneapolis, MN": 0.75,
-    "Detroit, MI": 0.65,
-    "Remote": 0.85,
-    
-    # International (USD equivalent)
-    "London, UK": 0.80,
-    "Dublin, Ireland": 0.65,
-    "Berlin, Germany": 0.60,
-    "Amsterdam, Netherlands": 0.70,
-    "Zurich, Switzerland": 1.10,
-    "Paris, France": 0.68,
-    "Toronto, Canada": 0.65,
-    "Vancouver, Canada": 0.68,
-    "Sydney, Australia": 0.75,
-    "Singapore": 0.85,
-    "Tokyo, Japan": 0.70,
-    "Tel Aviv, Israel": 0.75,
-    "Bangalore, India": 0.25,
-    "Mumbai, India": 0.30,
-    "Delhi, India": 0.28,
-
-    # More international cities (USD equivalent multiplier from SF baseline)
-    "Bangalore": 0.30,
-    "Bengaluru": 0.30,
-    "Hyderabad": 0.28,
-    "Pune": 0.28,
-    "Mumbai": 0.32,
-    "Delhi": 0.30,
-    "Chennai": 0.28,
-    "Gurgaon": 0.30,
-    "Noida": 0.28,
-    "Abu Dhabi": 0.70,
-    "Riyadh": 0.55,
-    "Doha": 0.60,
-    "Jakarta": 0.25,
-    "Bangkok": 0.28,
-    "Ho Chi Minh City": 0.22,
-    "Kuala Lumpur": 0.30,
-    "Manila": 0.22,
-    "Seoul": 0.55,
-    "Taipei": 0.40,
-    "Shanghai": 0.45,
-    "Beijing": 0.45,
-    "Shenzhen": 0.45,
-    "Hong Kong": 0.70,
-    "São Paulo": 0.35,
-    "Mexico City": 0.30,
-    "Tel Aviv": 0.65,
-    "Prague": 0.40,
-    "Warsaw": 0.35,
-    "Lisbon": 0.40,
-    "Barcelona": 0.45,
-    "Madrid": 0.45,
-    "Helsinki": 0.55,
-    "Stockholm": 0.60,
-    "Oslo": 0.60,
-    "Copenhagen": 0.60,
-    "Milan": 0.50,
-    "Zurich": 1.10,
-    "Geneva": 1.05,
-    "Edinburgh": 0.65,
-    "Manchester": 0.60,
-    "Cambridge": 0.70,
-    "Bristol": 0.60,
-    "Auckland": 0.55,
-    "Montreal": 0.65,
-}
+# Backward-compatible multiplier dict from registry
+LOCATION_SALARY_MULTIPLIERS = {k: e.salary_multiplier for k, e in LOCATION_REGISTRY.items()}
+# Also add bare-city aliases for backward compat with callers using "Bangalore" etc.
+for _k, _e in LOCATION_REGISTRY.items():
+    _city = _k.split(",")[0].strip()
+    if _city and _city != _k and _city not in LOCATION_SALARY_MULTIPLIERS:
+        LOCATION_SALARY_MULTIPLIERS[_city] = _e.salary_multiplier
+    for _alias in _e.aliases:
+        _title = _alias.strip().title()
+        if _title and _title not in LOCATION_SALARY_MULTIPLIERS:
+            LOCATION_SALARY_MULTIPLIERS[_title] = _e.salary_multiplier
 
 def normalize_position_title(position):
     """
