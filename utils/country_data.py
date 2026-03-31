@@ -596,161 +596,18 @@ COUNTRY_PROFILES: dict[str, dict] = {
     },
 }
 
-# Lowercase normalized location string → canonical country name (50+ entries).
-_LOCATION_TO_COUNTRY: dict[str, str] = {
-    "sf": "United States",
-    "san francisco, ca": "United States",
-    "new york, ny": "United States",
-    "los angeles, ca": "United States",
-    "seattle, wa": "United States",
-    "austin, tx": "United States",
-    "boston, ma": "United States",
-    "chicago, il": "United States",
-    "denver, co": "United States",
-    "atlanta, ga": "United States",
-    "miami, fl": "United States",
-    "dallas, tx": "United States",
-    "phoenix, az": "United States",
-    "philadelphia, pa": "United States",
-    "houston, tx": "United States",
-    "san diego, ca": "United States",
-    "san jose, ca": "United States",
-    "portland, or": "United States",
-    "detroit, mi": "United States",
-    "minneapolis, mn": "United States",
-    "charlotte, nc": "United States",
-    "nashville, tn": "United States",
-    "salt lake city, ut": "United States",
-    "raleigh, nc": "United States",
-    "pittsburgh, pa": "United States",
-    "columbus, oh": "United States",
-    "indianapolis, in": "United States",
-    "kansas city, mo": "United States",
-    "st. louis, mo": "United States",
-    "tampa, fl": "United States",
-    "orlando, fl": "United States",
-    "las vegas, nv": "United States",
-    "bangalore, india": "India",
-    "bengaluru, india": "India",
-    "mumbai, india": "India",
-    "delhi, india": "India",
-    "hyderabad, india": "India",
-    "chennai, india": "India",
-    "pune, india": "India",
-    "kolkata, india": "India",
-    "dubai, uae": "UAE",
-    "abu dhabi, uae": "UAE",
-    "sharjah, uae": "UAE",
-    "london, uk": "United Kingdom",
-    "manchester, uk": "United Kingdom",
-    "edinburgh, uk": "United Kingdom",
-    "birmingham, uk": "United Kingdom",
-    "berlin, germany": "Germany",
-    "munich, germany": "Germany",
-    "hamburg, germany": "Germany",
-    "frankfurt, germany": "Germany",
-    "paris, france": "France",
-    "lyon, france": "France",
-    "barcelona, spain": "Spain",
-    "madrid, spain": "Spain",
-    "stockholm, sweden": "Sweden",
-    "gothenburg, sweden": "Sweden",
-    "oslo, norway": "Norway",
-    "bergen, norway": "Norway",
-    "copenhagen, denmark": "Denmark",
-    "aarhus, denmark": "Denmark",
-    "amsterdam, netherlands": "Netherlands",
-    "eindhoven, netherlands": "Netherlands",
-    "rotterdam, netherlands": "Netherlands",
-    "zurich, switzerland": "Switzerland",
-    "geneva, switzerland": "Switzerland",
-    "lausanne, switzerland": "Switzerland",
-    "dublin, ireland": "Ireland",
-    "cork, ireland": "Ireland",
-    "singapore": "Singapore",
-    "tokyo, japan": "Japan",
-    "osaka, japan": "Japan",
-    "seoul, south korea": "South Korea",
-    "busan, south korea": "South Korea",
-    "riyadh, saudi arabia": "Saudi Arabia",
-    "jeddah, saudi arabia": "Saudi Arabia",
-    "doha, qatar": "Qatar",
-    "tel aviv, israel": "Israel",
-    "haifa, israel": "Israel",
-    "lisbon, portugal": "Portugal",
-    "porto, portugal": "Portugal",
-    "sydney, australia": "Australia",
-    "melbourne, australia": "Australia",
-    "brisbane, australia": "Australia",
-    "perth, australia": "Australia",
-    "auckland, new zealand": "New Zealand",
-    "wellington, new zealand": "New Zealand",
-    "christchurch, new zealand": "New Zealand",
-    "toronto, on": "Canada",
-    "vancouver, bc": "Canada",
-    "montreal, qc": "Canada",
-    "calgary, ab": "Canada",
-    "waterloo, on": "Canada",
-    "ottawa, on": "Canada",
-}
+from utils.location_registry import (
+    infer_country as _registry_infer_country,
+    LOCATION_REGISTRY,
+    _COUNTRY_SUFFIX_TO_COUNTRY,
+)
 
-_COUNTRY_SUFFIX_TO_COUNTRY: dict[str, str] = {
-    "india": "India",
-    "uae": "UAE",
-    "united arab emirates": "UAE",
-    "united kingdom": "United Kingdom",
-    "uk": "United Kingdom",
-    "great britain": "United Kingdom",
-    "usa": "United States",
-    "us": "United States",
-    "united states": "United States",
-    "united states of america": "United States",
-    "america": "United States",
-    "germany": "Germany",
-    "france": "France",
-    "spain": "Spain",
-    "sweden": "Sweden",
-    "norway": "Norway",
-    "denmark": "Denmark",
-    "portugal": "Portugal",
-    "netherlands": "Netherlands",
-    "holland": "Netherlands",
-    "ireland": "Ireland",
-    "switzerland": "Switzerland",
-    "singapore": "Singapore",
-    "japan": "Japan",
-    "south korea": "South Korea",
-    "korea": "South Korea",
-    "saudi arabia": "Saudi Arabia",
-    "qatar": "Qatar",
-    "israel": "Israel",
-    "australia": "Australia",
-    "new zealand": "New Zealand",
-    "canada": "Canada",
-}
-
-for _code in _US_STATE_CODES:
-    _COUNTRY_SUFFIX_TO_COUNTRY[_code.lower()] = "United States"
-for _code in _CA_PROVINCE_CODES:
-    _COUNTRY_SUFFIX_TO_COUNTRY[_code.lower()] = "Canada"
+# Backward-compatible view
+_LOCATION_TO_COUNTRY = {k.lower(): e.country for k, e in LOCATION_REGISTRY.items() if e.country}
 
 
 def infer_country(location: str) -> str | None:
-    if not location or not str(location).strip():
-        return None
-    normalized = " ".join(str(location).strip().split()).lower()
-    if normalized == "remote":
-        return None
-    if normalized in _LOCATION_TO_COUNTRY:
-        return _LOCATION_TO_COUNTRY[normalized]
-    if normalized in _COUNTRY_SUFFIX_TO_COUNTRY:
-        return _COUNTRY_SUFFIX_TO_COUNTRY[normalized]
-    parts = [p.strip() for p in normalized.split(",") if p.strip()]
-    for segment in reversed(parts):
-        seg = segment.lower()
-        if seg in _COUNTRY_SUFFIX_TO_COUNTRY:
-            return _COUNTRY_SUFFIX_TO_COUNTRY[seg]
-    return None
+    return _registry_infer_country(location)
 
 
 def get_relocation_factors(from_country: str, to_country: str) -> dict | None:
