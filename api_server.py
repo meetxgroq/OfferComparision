@@ -41,6 +41,7 @@ from pocketflow import Flow, AsyncFlow
 from utils.call_llm import get_provider_info
 from utils.currency import get_all_currencies, infer_currency
 from utils.country_data import get_all_countries, infer_country
+from utils.data_refresh import start_background_refresh
 from utils.offers_db import list_offers, upsert_offers, delete_offer, delete_offer_by_client_id
 
 
@@ -134,6 +135,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+def _start_data_refresh():
+    start_background_refresh()
 
 
 @app.options("/api/analyze")
