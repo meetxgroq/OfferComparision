@@ -25,6 +25,7 @@ import AdvancedOfferForm from '@/components/AdvancedOfferForm'
 import PreferencesPanel from '@/components/PreferencesPanel'
 import OfferCards from '@/components/OfferCards'
 import AnalysisResults from '@/components/AnalysisResults'
+import AnalysisProgress from '@/components/AnalysisProgress'
 import { Offer, UserPreferences } from '@/types'
 
 export default function OfferComparePage() {
@@ -663,9 +664,24 @@ export default function OfferComparePage() {
           )}
         </section>
 
+        {/* Analysis Progress Indicator */}
+        <AnimatePresence>
+          {isAnalyzing && (
+            <motion.div
+              key="analysis-progress"
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.5 }}
+            >
+              <AnalysisProgress isDeepAnalysis={useDeepAnalysis} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Analysis Results */}
         <AnimatePresence>
-          {analysisResults && (
+          {analysisResults && !isAnalyzing && (
             <motion.div
               id="analysis-results"
               initial={{ opacity: 0, y: 40 }}
