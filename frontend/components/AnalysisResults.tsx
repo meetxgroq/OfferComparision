@@ -26,7 +26,7 @@ import {
   CheckCircleIcon as CheckCircleIconSolid,
   ExclamationTriangleIcon as ExclamationTriangleIconSolid
 } from '@heroicons/react/24/solid'
-import { Radar, Bar, Doughnut } from 'react-chartjs-2'
+import { Radar, Bar, Doughnut, Line } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
   RadialLinearScale,
@@ -36,11 +36,12 @@ import {
   LineElement,
   BarElement,
   ArcElement,
+  Filler,
   Tooltip,
   Legend,
 } from 'chart.js'
 import ReactMarkdown from 'react-markdown'
-import type { AnalysisResults } from '@/types'
+import type { AnalysisResults, OfferEquityProjection } from '@/types'
 import { formatCurrency, getCurrencySymbol } from '@/lib/currency'
 import VisualDashboard from './VisualDashboard'
 
@@ -53,9 +54,41 @@ ChartJS.register(
   LineElement,
   BarElement,
   ArcElement,
+  Filler,
   Tooltip,
   Legend
 )
+
+function buildTimelineChartData(projection: OfferEquityProjection) {
+  const years = projection.yearly_comp?.years || []
+  const scenarios = projection.scenarios || []
+  const labels = years.map(y => `Year ${y.year}`)
+  const colors = ['#ef4444', '#f97316', '#6366f1', '#22c55e', '#06b6d4']
+
+  return {
+    labels,
+    datasets: scenarios.map((sc: any, i: number) => ({
+      label: sc.label,
+      data: years.map((y: any) => y.total_by_scenario[i]),
+      borderColor: colors[i],
+      backgroundColor: colors[i] + '20',
+      fill: i === 2,
+      tension: 0.3,
+      pointRadius: 4,
+    })),
+  }
+}
+
+function buildCashRiskDoughnutData(ratio: any) {
+  return {
+    labels: ['Guaranteed Cash', 'At-Risk Equity'],
+    datasets: [{
+      data: [ratio.cash_ratio * 100, ratio.at_risk_ratio * 100],
+      backgroundColor: ['#22c55e', '#ef4444'],
+      borderWidth: 0,
+    }],
+  }
+}
 
 interface AnalysisResultsProps {
   results: AnalysisResults
@@ -1261,15 +1294,71 @@ export default function AnalysisResults({ results, isDeepAnalysis = false, compa
         }
 
         {/* Timeline Tab */}
-        {
-          activeTab === 'timeline' && (
-            <div className="text-center py-20">
-              <ClockIcon className="h-16 w-16 text-slate-600 mx-auto mb-4" />
-              <h4 className="text-lg font-bold text-white mb-2">Decision Timeline</h4>
-              <p className="text-slate-400">Coming soon in the next update.</p>
-            </div>
-          )
-        }
+        {activeTab === 'timeline' && (
+          <div className="space-y-8">
+            {(() => {
+              const projections: OfferEquityProjection[] =
+                results.visualization_data?.equity_projections || []
+              if (projections.length === 0) {
+                return (
+                  <div className="text-center py-20">
+                    <ClockIcon className="h-16 w-16 text-slate-600 mx-auto mb-4" />
+                    <h4 className="text-lg font-bold text-white mb-2">Decision Timeline</h4>
+                    <p className="text-slate-400">No equity projection data available. Run analysis first.</p>
+                  </div>
+                )
+              }
+              return projections.map((proj) => (
+                <div key={proj.offer_id} className="bg-slate-800/60 rounded-xl p-6 border border-slate-700">
+                  <h4 className="text-lg font-bold text-white mb-4">{proj.company} - Equity Projection</h4>
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Year-by-year Line Chart */}
+                    <div className="lg:col-span-2">
+                      <h5 className="text-sm font-semibold text-slate-300 mb-2">Year-by-Year Total Compensation</h5>
+                      <Line
+                        data={buildTimelineChartData(proj)}
+                        options={{
+                          responsive: true,
+                          plugins: { legend: { labels: { color: '#cbd5e1' } } },
+                          scales: {
+                            x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+                            y: {
+                              ticks: { color: '#94a3b8', callback: (v: any) => `$${(v/1000).toFixed(0)}k` },
+                              grid: { color: '#334155' },
+                            },
+                          },
+                        }}
+                      />
+                    </div>
+                    {/* Cash vs Risk Doughnut */}
+                    <div>
+                      <h5 className="text-sm font-semibold text-slate-300 mb-2">Cash vs At-Risk</h5>
+                      <Doughnut
+                        data={buildCashRiskDoughnutData(proj.cash_risk_ratio)}
+                        options={{
+                          responsive: true,
+                          plugins: { legend: { labels: { color: '#cbd5e1' } } },
+                        }}
+                      />
+                      <div className="mt-3 text-center">
+                        <span className="text-green-400 text-sm font-semibold">
+                          {(proj.cash_risk_ratio.cash_ratio * 100).toFixed(0)}% guaranteed
+                        </span>
+                        <span className="text-slate-500 mx-2">|</span>
+                        <span className="text-red-400 text-sm font-semibold">
+                          {(proj.cash_risk_ratio.at_risk_ratio * 100).toFixed(0)}% at risk
+                        </span>
+                      </div>
+                      <div className="mt-2 text-center text-xs text-slate-400">
+                        Risk-adjusted equity: ${proj.risk_adjusted_equity?.toLocaleString() || 'N/A'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            })()}
+          </div>
+        )}
 
       </div >
     </motion.div >
