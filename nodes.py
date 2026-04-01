@@ -801,7 +801,8 @@ class AIAnalysisNode(AsyncNode):
             "offers": shared.get("offers", []),
             "comparison_results": shared.get("comparison_results", {}),
             "user_preferences": shared.get("user_preferences", {}),
-            "scoring_weights": shared.get("scoring_weights", {})
+            "scoring_weights": shared.get("scoring_weights", {}),
+            "equity_projections": shared.get("equity_projections", []),
         }
     
     async def exec_async(self, prep_data):
@@ -817,7 +818,8 @@ class AIAnalysisNode(AsyncNode):
         print(f"Generating AI-powered analysis and recommendations...")
         
         # Prepare comprehensive data for AI analysis
-        analysis_prompt = self._build_analysis_prompt(offers, comparison_results, user_preferences)
+        equity_projections = prep_data.get("equity_projections", [])
+        analysis_prompt = self._build_analysis_prompt(offers, comparison_results, user_preferences, equity_projections)
         
         # Get comprehensive AI analysis with async LLM call
         try:
@@ -916,7 +918,7 @@ class AIAnalysisNode(AsyncNode):
         print("AI analysis completed")
         return "default"
     
-    def _build_analysis_prompt(self, offers, comparison_results, user_preferences):
+    def _build_analysis_prompt(self, offers, comparison_results, user_preferences, equity_projections=None):
         """Build comprehensive prompt for AI analysis."""
         prompt = f"""
         Analyze these {len(offers)} job offers and provide comprehensive insights:
@@ -938,6 +940,21 @@ class AIAnalysisNode(AsyncNode):
         - Score: {offer.get('score_data', {}).get('total_score', 'N/A')}
         """
         
+        if equity_projections:
+            prompt += "\n        EQUITY RISK ANALYSIS:\n"
+            for ep in equity_projections:
+                cr = ep.get("cash_risk_ratio", {})
+                raj = ep.get("risk_adjusted_equity", 0)
+                scenarios = ep.get("scenarios", {}).get("scenarios", [])
+                flat_eq = next((s["adjusted_annual_equity"] for s in scenarios if s["stock_change"] == 0), 0)
+                bear_eq = next((s["adjusted_annual_equity"] for s in scenarios if s["stock_change"] == -0.5), 0)
+                prompt += f"""
+        {ep.get('company', 'Unknown')}:
+        - Cash vs Equity ratio: {cr.get('cash_ratio', 0):.0%} guaranteed / {cr.get('at_risk_ratio', 0):.0%} at-risk
+        - Risk-adjusted equity: ${raj:,.0f} (vs face value ${flat_eq:,.0f})
+        - Bear case (-50% stock): equity drops to ${bear_eq:,.0f}/yr
+        """
+        
         prompt += f"""
         
         TOP CHOICE: {comparison_results.get('top_offer', {}).get('company', 'N/A')}
@@ -951,6 +968,7 @@ class AIAnalysisNode(AsyncNode):
         6. Final recommendation with reasoning
         7. Red flags or concerns to watch out for
         8. Questions to ask each company before deciding
+        9. Equity risk assessment: which offer has the most/least risk based on cash-equity ratio and stock volatility
         
         Focus on actionable insights for decision-making.
         """
