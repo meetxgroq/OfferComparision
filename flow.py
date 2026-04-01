@@ -11,6 +11,7 @@ from nodes import (
     COLAnalysisNode,
     MarketBenchmarkingNode,
     PreferenceScoringNode,
+    EquityProjectionNode,
     AIAnalysisNode,
     VisualizationPreparationNode,
     ReportGenerationNode,
@@ -31,6 +32,7 @@ def create_offer_comparison_flow():
     4. COLAnalysis → Net Savings Analysis (BatchNode)
     5. MarketBenchmarking → Industry comparison and percentiles (AsyncBatchNode)
     6. PreferenceScoring → Personalized weighted scoring (BatchNode)
+    6.5. EquityProjection → Equity risk scenarios and cash-risk ratios (BatchNode)
     7. AIAnalysis → Comprehensive AI recommendations (AsyncNode)
     8. VisualizationPreparation → Interactive chart data (Regular Node)
     9. ReportGeneration → Final comprehensive report (Regular Node)
@@ -48,6 +50,7 @@ def create_offer_comparison_flow():
     col_analysis = COLAnalysisNode()                # BatchNode
     market_benchmarking = MarketBenchmarkingNode()  # AsyncBatchNode
     preference_scoring = PreferenceScoringNode()    # BatchNode
+    equity_projection = EquityProjectionNode()      # BatchNode
     ai_analysis = AIAnalysisNode()                  # AsyncNode
     visualization_prep = VisualizationPreparationNode()  # Regular Node
     report_generation = ReportGenerationNode()     # Regular Node
@@ -58,7 +61,8 @@ def create_offer_comparison_flow():
     tax_calculation >> col_analysis
     col_analysis >> market_benchmarking
     market_benchmarking >> preference_scoring
-    preference_scoring >> ai_analysis
+    preference_scoring >> equity_projection
+    equity_projection >> ai_analysis
     ai_analysis >> visualization_prep
     visualization_prep >> report_generation
     

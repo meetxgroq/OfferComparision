@@ -17,6 +17,12 @@ from utils.scoring import calculate_offer_score, compare_offers, customize_weigh
 from utils.viz_formatter import create_visualization_package
 from utils.company_db import get_company_data, enrich_company_data
 from utils.json_sanitize import sanitize_for_json
+from utils.equity_projector import (
+    project_equity_scenarios,
+    calculate_yearly_comp,
+    calculate_cash_risk_ratio,
+    calculate_risk_adjusted_value,
+)
 import json
 import asyncio
 import time
@@ -710,6 +716,77 @@ class PreferenceScoringNode(BatchNode):
         shared["scoring_weights"] = weights
         
         print("Personalized scoring completed")
+        return "default"
+
+class EquityProjectionNode(BatchNode):
+    """
+    Project equity scenarios, year-by-year comp, and cash-risk ratios per offer.
+    """
+
+    def prep(self, shared):
+        return shared.get("offers", [])
+
+    def exec(self, offer):
+        company = offer.get("company", "Unknown")
+        print(f"\nProjecting equity scenarios for {company}...")
+
+        equity_annual = offer.get("equity", 0)
+        company_data = offer.get("company_research", {})
+        company_stage = company_data.get("stage", "growth")
+        stability = company_data.get("metrics", {}).get(
+            "stability_score", {}
+        ).get("score", 7)
+        equity_type = offer.get("equity_type", "rsu")
+        vesting_years = offer.get("vesting_years", 4)
+        vesting_schedule = offer.get("vesting_schedule", "standard")
+        strike_price = offer.get("strike_price")
+        current_price = offer.get("current_stock_price")
+
+        scenarios_data = project_equity_scenarios(
+            equity_annual, company_stage, stability,
+            equity_type=equity_type, vesting_years=vesting_years,
+            vesting_schedule=vesting_schedule,
+            strike_price=strike_price, current_price=current_price,
+        )
+
+        yearly = calculate_yearly_comp(
+            base=offer.get("base_salary", 0),
+            equity_annual=equity_annual,
+            bonus=offer.get("bonus", 0),
+            signing_bonus=offer.get("signing_bonus", 0),
+            vesting_schedule=vesting_schedule,
+            scenarios=scenarios_data["scenarios"],
+            vesting_years=vesting_years,
+        )
+
+        cash_risk = calculate_cash_risk_ratio(
+            offer.get("base_salary", 0),
+            offer.get("bonus", 0),
+            offer.get("signing_bonus", 0),
+            equity_annual,
+        )
+
+        risk_adj = calculate_risk_adjusted_value(
+            equity_annual, company_stage, stability, equity_type=equity_type,
+        )
+
+        return {
+            "offer_id": offer["id"],
+            "company": company,
+            "scenarios": scenarios_data,
+            "yearly_comp": yearly,
+            "cash_risk_ratio": cash_risk,
+            "risk_adjusted_equity": risk_adj,
+        }
+
+    def post(self, shared, prep_res, exec_res_list):
+        proj_lookup = {p["offer_id"]: p for p in exec_res_list}
+        for offer in shared.get("offers", []):
+            if offer["id"] in proj_lookup:
+                offer["equity_projection"] = proj_lookup[offer["id"]]
+
+        shared["equity_projections"] = exec_res_list
+        print(f"Equity projections computed for {len(exec_res_list)} offers")
         return "default"
 
 class AIAnalysisNode(AsyncNode):
