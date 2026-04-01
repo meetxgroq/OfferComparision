@@ -10,7 +10,7 @@ import {
   ExclamationTriangleIcon,
   CurrencyDollarIcon
 } from '@heroicons/react/24/outline'
-import { Offer, WORK_TYPES, EMPLOYMENT_TYPES, DOMAINS, BENEFITS_GRADES } from '@/types'
+import { Offer, WORK_TYPES, EMPLOYMENT_TYPES, DOMAINS, BENEFITS_GRADES, EQUITY_TYPES, VESTING_SCHEDULES } from '@/types'
 import { POPULAR_COMPANIES } from '@/data/companies'
 import { getApiBase } from '@/lib/api'
 import { FALLBACK_CURRENCIES, mergeCurrencies } from '@/lib/currencies'
@@ -48,7 +48,11 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
     relocation_support: editOffer?.relocation_support || false,
     currency: editOffer?.currency || 'USD',
     country: editOffer?.country,
-    other_perks: editOffer?.other_perks || ''
+    other_perks: editOffer?.other_perks || '',
+    equity_type: editOffer?.equity_type || 'rsu',
+    vesting_schedule: editOffer?.vesting_schedule || 'standard',
+    strike_price: editOffer?.strike_price,
+    current_stock_price: editOffer?.current_stock_price,
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isUploading, setIsUploading] = useState(false)
@@ -265,7 +269,11 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
       currency: formData.currency || 'USD',
       country: formData.country,
       other_perks: formData.other_perks,
-      total_compensation: totalCompensation
+      total_compensation: totalCompensation,
+      equity_type: formData.equity_type || 'rsu',
+      vesting_schedule: formData.vesting_schedule || 'standard',
+      strike_price: formData.strike_price,
+      current_stock_price: formData.current_stock_price,
     }
 
     onSubmit(offer)
@@ -736,6 +744,61 @@ export default function AdvancedOfferForm({ onSubmit, onClose, editOffer }: Adva
                       <span>Total Annual Compensation</span>
                       <span className="text-xl font-bold">{formatCurrency(totalCompensation, formData.currency || 'USD')}</span>
                     </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Equity Details */}
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">Equity Details</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">Equity Type</label>
+                    <select
+                      value={formData.equity_type || 'rsu'}
+                      onChange={(e) => setFormData(prev => ({ ...prev, equity_type: e.target.value as any }))}
+                      className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white text-sm"
+                    >
+                      {EQUITY_TYPES.map(t => (
+                        <option key={t.value} value={t.value}>{t.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">Vesting Schedule</label>
+                    <select
+                      value={formData.vesting_schedule || 'standard'}
+                      onChange={(e) => setFormData(prev => ({ ...prev, vesting_schedule: e.target.value as any }))}
+                      className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white text-sm"
+                    >
+                      {VESTING_SCHEDULES.map(s => (
+                        <option key={s.value} value={s.value}>{s.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                {formData.equity_type === 'options' && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-400 mb-1">Strike Price ($)</label>
+                      <input
+                        type="number" min="0" step="0.01"
+                        value={formData.strike_price || ''}
+                        onChange={(e) => setFormData(prev => ({ ...prev, strike_price: parseFloat(e.target.value) || undefined }))}
+                        className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white text-sm"
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-400 mb-1">Current Stock Price ($)</label>
+                      <input
+                        type="number" min="0" step="0.01"
+                        value={formData.current_stock_price || ''}
+                        onChange={(e) => setFormData(prev => ({ ...prev, current_stock_price: parseFloat(e.target.value) || undefined }))}
+                        className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white text-sm"
+                        placeholder="0.00"
+                      />
+                    </div>
                   </div>
                 )}
               </div>
