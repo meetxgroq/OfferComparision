@@ -476,6 +476,23 @@ def _find_best_values(rows, offers_data):
     
     return best_indices
 
+def format_equity_projection_charts(offers_data):
+    """Format equity projection data for Chart.js consumption."""
+    projections = []
+    for offer in offers_data:
+        proj = offer.get("equity_projection") or offer.get("offer_data", {}).get("equity_projection")
+        if not proj:
+            continue
+        projections.append({
+            "offer_id": proj.get("offer_id", offer.get("offer_id", "")),
+            "company": proj.get("company", offer.get("company", "")),
+            "scenarios": proj.get("scenarios", {}).get("scenarios", []),
+            "yearly_comp": proj.get("yearly_comp", {}),
+            "cash_risk_ratio": proj.get("cash_risk_ratio", {}),
+            "risk_adjusted_equity": proj.get("risk_adjusted_equity", 0),
+        })
+    return projections
+
 def create_visualization_package(offers_data, weights=None):
     """
     Create complete visualization package for offer comparison.
@@ -499,6 +516,7 @@ def create_visualization_package(offers_data, weights=None):
         "market_position": format_market_comparison_chart(offers_data),
         "factor_importance": format_factor_importance_chart(weights or {}),
         "comparison_table": format_comparison_table(offers_data),
+        "equity_projections": format_equity_projection_charts(offers_data),
         "summary_stats": {
             "total_offers": len(offers_data),
             "avg_score": sum(offer["total_score"] for offer in offers_data) / len(offers_data),
