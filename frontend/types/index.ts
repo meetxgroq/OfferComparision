@@ -23,6 +23,11 @@ export interface Offer {
   country?: string // Inferred from location
   other_perks?: string
   total_compensation?: number
+  equity_type?: 'rsu' | 'options' | 'cash'
+  vesting_years?: number
+  vesting_schedule?: 'standard' | 'frontloaded' | 'backloaded' | 'monthly'
+  strike_price?: number
+  current_stock_price?: number
 
   // Analysis results (populated after API call)
   col_adjusted_salary?: number
@@ -143,6 +148,7 @@ export interface AnalysisResults {
     chart_data?: any
     comparison_table?: any
     radar_chart?: any
+    equity_projections?: OfferEquityProjection[]
   }
   offers?: Array<any>
 }
@@ -180,6 +186,50 @@ export const DOMAINS = [
   { value: 'product', label: 'Product Management' },
   { value: 'design', label: 'Design' },
   { value: 'qa', label: 'QA Engineering' }
+] as const
+
+export interface EquityScenario {
+  label: string
+  stock_change: number
+  adjusted_annual_equity: number
+}
+
+export interface YearlyComp {
+  year: number
+  base: number
+  bonus: number
+  signing_bonus: number
+  vest_fraction: number
+  equity_by_scenario: number[]
+  total_by_scenario: number[]
+}
+
+export interface OfferEquityProjection {
+  offer_id: string
+  company: string
+  scenarios: EquityScenario[]
+  yearly_comp: { years: YearlyComp[] }
+  cash_risk_ratio: {
+    cash_ratio: number
+    at_risk_ratio: number
+    cash_total: number
+    at_risk_total: number
+    total: number
+  }
+  risk_adjusted_equity: number
+}
+
+export const EQUITY_TYPES = [
+  { value: 'rsu', label: 'RSU (Restricted Stock Units)' },
+  { value: 'options', label: 'Stock Options' },
+  { value: 'cash', label: 'Cash Equivalent' },
+] as const
+
+export const VESTING_SCHEDULES = [
+  { value: 'standard', label: 'Standard (1yr cliff, 25%/yr)' },
+  { value: 'frontloaded', label: 'Frontloaded (Amazon-style 5/15/40/40)' },
+  { value: 'backloaded', label: 'Backloaded (10/10/20/60)' },
+  { value: 'monthly', label: 'Monthly (no cliff)' },
 ] as const
 
 export const BENEFITS_GRADES = [

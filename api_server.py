@@ -57,6 +57,10 @@ class Offer(BaseModel):
     total_compensation: Optional[float] = None
     years_experience: Optional[int] = None
     vesting_years: Optional[int] = 4
+    equity_type: Optional[str] = "rsu"  # "rsu", "options", "cash"
+    vesting_schedule: Optional[str] = "standard"  # standard, frontloaded, backloaded, monthly
+    strike_price: Optional[float] = None  # For stock options
+    current_stock_price: Optional[float] = None  # For stock options
     level: Optional[str] = None  # Internal company level (e.g. "61", "IC3")
     benefits_grade: Optional[str] = None
     wlb_grade: Optional[str] = None
