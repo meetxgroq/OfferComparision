@@ -226,7 +226,8 @@ def calculate_offer_score(offer_data, user_preferences=None, weights=None):
     company_data = offer_data.get("company_research", {})
     company_stage = company_data.get("stage", "growth")
     stability_score = company_data.get("metrics", {}).get("stability_score", {}).get("score", 7)
-    factor_scores["equity_upside"] = calculate_equity_score(equity_value, company_stage, stability_score)
+    vesting_years = offer_data.get("vesting_years", 4)
+    factor_scores["equity_upside"] = calculate_equity_score(equity_value, company_stage, stability_score, vesting_years)
     
     # 4. Work-Life Balance Score
     # Check for direct grade user input first, then company metrics

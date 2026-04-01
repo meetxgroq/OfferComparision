@@ -506,5 +506,33 @@ def sample_offers_list():
     ]
 
 
+def test_vesting_years_passed_to_equity_score():
+    """Ensure calculate_offer_score passes vesting_years from offer."""
+    from utils.scoring import calculate_offer_score
+    offer = {
+        "id": "t1", "company": "X", "position": "SWE", "location": "NYC",
+        "base_salary": 150000, "equity": 50000, "bonus": 20000,
+        "total_compensation": 220000, "vesting_years": 5,
+        "company_research": {
+            "stage": "growth",
+            "metrics": {"stability_score": {"score": 7}}
+        },
+        "total_comp_analysis": {"market_percentile": 70},
+    }
+    prefs = {"location_preferences": {}}
+    weights = {"base_salary": 0.2, "total_compensation": 0.15,
+               "equity_upside": 0.15, "work_life_balance": 0.15,
+               "career_growth": 0.15, "company_culture": 0.1,
+               "benefits_quality": 0.05, "location_preference": 0.05}
+    from unittest.mock import patch
+    with patch("utils.scoring.calculate_equity_score") as mock_eq:
+        mock_eq.return_value = 50
+        calculate_offer_score(offer, prefs, weights)
+        mock_eq.assert_called_once()
+        _, kwargs = mock_eq.call_args
+        args = mock_eq.call_args
+        assert args[0][3] == 5 or args[1].get("vesting_years") == 5
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"]) 
