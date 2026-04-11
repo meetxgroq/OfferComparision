@@ -1321,6 +1321,7 @@ class QuickVisualizationNode(Node):
             "ai_analysis": shared.get("ai_analysis", ""),
             "decision_framework": shared.get("decision_framework", ""),
             "scoring_weights": shared.get("scoring_weights", {}),
+            "equity_projections": shared.get("equity_projections", []),
             "user_preferences": shared.get("user_preferences", {})
         }
     
@@ -1341,6 +1342,10 @@ class QuickVisualizationNode(Node):
             "bar_chart": viz_package.get("bar_chart"),
             "summary_stats": viz_package.get("summary_stats", {})
         }
+        
+        # Include equity projection data for Timeline tab
+        from utils.viz_formatter import format_equity_projection_charts
+        essential_viz["equity_projections"] = format_equity_projection_charts(ranked_offers)
         
         # Generate concise executive summary
         top_offer = comparison_results.get("top_offer", {})

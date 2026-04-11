@@ -213,6 +213,32 @@ def check_and_consume_rate_limit(user_id: str) -> None:
     }).eq("user_id", user_id).execute()
 
 
+def refund_rate_limit(user_id: str) -> None:
+    """Refund one rate-limit slot (e.g. when analysis fails due to server error)."""
+    supabase = _get_supabase()
+    today = date.today().isoformat()
+
+    row = supabase.table("user_usage").select("*").eq("user_id", user_id).execute()
+    if not row.data or len(row.data) == 0:
+        return
+
+    data = row.data[0]
+    last_date = data.get("last_used_date")
+    daily_count = int(data.get("daily_count", 0))
+    total = int(data.get("total_analyses", 0))
+
+    if last_date != today or daily_count <= 0:
+        return
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    supabase.table("user_usage").update({
+        "daily_count": max(0, daily_count - 1),
+        "total_analyses": max(0, total - 1),
+        "updated_at": now_iso,
+    }).eq("user_id", user_id).execute()
+    logger.info("Refunded rate-limit slot for user %s", user_id)
+
+
 def get_usage(user_id: str) -> dict:
     """Return current user's usage for GET /api/usage (daily_count, limit, remaining)."""
     supabase = _get_supabase()

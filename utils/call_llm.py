@@ -261,7 +261,13 @@ def call_llm_gemini(prompt: str, model: str = "gemini-2.5-flash", temperature: f
                 if "404" in error_str or "NOT_FOUND" in error_str:
                     print(f"[ERROR] Gemini Model {current_model} not found. Falling back...")
                     last_error = e
-                    break  # Exit retry loop, move to next model
+                    break
+
+                is_server_error = any(code in error_str for code in ["500", "502", "503", "504", "INTERNAL", "UNAVAILABLE"])
+                if is_server_error:
+                    print(f"[5xx] Server error from {current_model}: {error_str[:120]}. Falling back to next model...")
+                    last_error = e
+                    break
                     
                 raise Exception(f"Gemini API error ({current_model}): {str(e)}")
             

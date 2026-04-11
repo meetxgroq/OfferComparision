@@ -25,6 +25,7 @@ from utils.json_sanitize import sanitize_for_json
 from utils.auth import (
     verify_jwt,
     check_and_consume_rate_limit,
+    refund_rate_limit,
     get_usage as get_usage_data,
 )
 from nodes import (
@@ -33,6 +34,7 @@ from nodes import (
     COLAnalysisNode,
     MarketBenchmarkingNode,
     PreferenceScoringNode,
+    EquityProjectionNode,
     AIAnalysisNode,
     VisualizationPreparationNode,
     ReportGenerationNode,
@@ -237,6 +239,7 @@ def _build_flow() -> AsyncFlow:
     col_analysis = COLAnalysisNode()
     market_benchmarking = MarketBenchmarkingNode()
     preference_scoring = PreferenceScoringNode()
+    equity_projection = EquityProjectionNode()
     ai_analysis = AIAnalysisNode()
     visualization_prep = VisualizationPreparationNode()
     report_generation = ReportGenerationNode()
@@ -245,7 +248,8 @@ def _build_flow() -> AsyncFlow:
     tax_calculation >> col_analysis
     col_analysis >> market_benchmarking
     market_benchmarking >> preference_scoring
-    preference_scoring >> ai_analysis
+    preference_scoring >> equity_projection
+    equity_projection >> ai_analysis
     ai_analysis >> visualization_prep
     visualization_prep >> report_generation
 
@@ -311,6 +315,7 @@ async def analyze(
     try:
         result = await _run_analysis(shared)
     except Exception as e:
+        refund_rate_limit(_user_id)
         raise HTTPException(status_code=500, detail=str(e))
 
     result = sanitize_for_json(result)
@@ -364,6 +369,7 @@ async def analyze_quick(
     try:
         result = await _run_quick_analysis(shared)
     except Exception as e:
+        refund_rate_limit(_user_id)
         raise HTTPException(status_code=500, detail=str(e))
 
     result = sanitize_for_json(result)

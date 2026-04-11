@@ -248,6 +248,11 @@ export default function OfferComparePage() {
     setIsAnalyzing(true)
     setError(null)
 
+    // Scroll to progress indicator
+    setTimeout(() => {
+      document.getElementById('analysis-progress')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 200)
+
     try {
       const token = await getAccessToken()
       const base = getApiBase()
@@ -673,6 +678,7 @@ export default function OfferComparePage() {
         <AnimatePresence>
           {isAnalyzing && (
             <motion.div
+              id="analysis-progress"
               key="analysis-progress"
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}

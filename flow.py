@@ -91,9 +91,10 @@ def create_quick_analysis_flow():
     
     Flow Sequence:
     1. QuickFinancialAnalysis → Tax + COL in one pass (BatchNode)
-    2. QuickMarketAnalysis → Cached company data + quick market lookups (AsyncParallelBatchNode)
-    3. QuickAIAnalysis → Single comprehensive LLM call for scoring + recommendations (AsyncNode)
-    4. QuickVisualization → Essential charts + concise report (Node)
+    2. EquityProjection → Equity risk scenarios and cash-risk ratios (BatchNode)
+    3. QuickMarketAnalysis → Cached company data + quick market lookups (AsyncParallelBatchNode)
+    4. QuickAIAnalysis → Single comprehensive LLM call for scoring + recommendations (AsyncNode)
+    5. QuickVisualization → Essential charts + concise report (Node)
     
     Note: This flow expects offers and user_preferences to already be in the shared store.
     The API server handles offer collection before running this flow.
@@ -106,12 +107,13 @@ def create_quick_analysis_flow():
     
     # Create quick analysis nodes
     quick_financial = QuickFinancialAnalysisNode()
+    equity_projection = EquityProjectionNode()
     quick_market = QuickMarketAnalysisNode()
     quick_ai = QuickAIAnalysisNode()
     quick_viz = QuickVisualizationNode()
     
     # Connect nodes in sequence
-    quick_financial >> quick_market >> quick_ai >> quick_viz
+    quick_financial >> equity_projection >> quick_market >> quick_ai >> quick_viz
     
     # Create AsyncFlow
     flow = AsyncFlow(start=quick_financial)
